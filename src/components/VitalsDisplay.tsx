@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Droplets, Activity, Zap } from 'lucide-react';
+import { Heart, Droplets, Activity, Zap, Gauge } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface VitalsDisplayProps {
@@ -9,6 +9,7 @@ interface VitalsDisplayProps {
     spO2: number | null;
     glucose: number | null;
     viscosity: number | null;
+    bloodPressure: string | null;
   };
   isProcessing: boolean;
 }
@@ -25,6 +26,14 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
     if (!spo2) return 'text-gray-400';
     if (spo2 >= 95) return 'text-green-500';
     if (spo2 >= 90) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
+  const getBPColor = (bp: string | null) => {
+    if (!bp) return 'text-gray-400';
+    const [systolic] = bp.split('/').map(Number);
+    if (systolic < 120) return 'text-green-500';
+    if (systolic < 140) return 'text-yellow-500';
     return 'text-red-500';
   };
 
@@ -48,6 +57,16 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       color: getSpO2Color(vitals.spO2),
       range: [80, 100],
       normalRange: [95, 100]
+    },
+    {
+      key: 'bloodPressure',
+      title: 'Blood Pressure',
+      icon: Gauge,
+      value: vitals.bloodPressure,
+      unit: 'mmHg',
+      color: getBPColor(vitals.bloodPressure),
+      displayValue: vitals.bloodPressure || '--/--',
+      showProgress: false
     },
     {
       key: 'glucose',
@@ -93,12 +112,12 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
           <CardContent className="pt-0">
             <div className="flex items-center justify-between mb-2">
               <span className={`text-2xl font-bold ${vital.color}`}>
-                {vital.value ? vital.value.toFixed(1) : '--'}
+                {vital.displayValue || (vital.value ? vital.value.toFixed(1) : '--')}
               </span>
               <span className="text-sm text-gray-500">{vital.unit}</span>
             </div>
             
-            {vital.value && (
+            {vital.value && vital.showProgress !== false && vital.range && (
               <div className="space-y-1">
                 <Progress 
                   value={((vital.value - vital.range[0]) / (vital.range[1] - vital.range[0])) * 100}
@@ -111,6 +130,12 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
                   </span>
                   <span>{vital.range[1]}</span>
                 </div>
+              </div>
+            )}
+            
+            {vital.key === 'bloodPressure' && vital.value && (
+              <div className="text-xs text-gray-500 mt-1">
+                Normal: &lt;120/80 mmHg
               </div>
             )}
           </CardContent>
