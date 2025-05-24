@@ -6,6 +6,7 @@ import { Heart, Activity, Droplets, Zap, Bluetooth, Camera, Save } from 'lucide-
 import VideoCapture from '../components/VideoCapture';
 import BluetoothConnector from '../components/BluetoothConnector';
 import VitalsHistory from '../components/VitalsHistory';
+import ManualCalibration from '../components/ManualCalibration';
 import { useToast } from '@/hooks/use-toast';
 
 interface VitalsData {
@@ -15,6 +16,13 @@ interface VitalsData {
   bloodSugar: number | null;
   bloodViscosity: number | null;
   timestamp?: string;
+}
+
+interface CalibrationData {
+  userGlucose: number;
+  userViscosity: number;
+  userBloodPressure: string;
+  timestamp: string;
 }
 
 const VitalsMonitor = () => {
@@ -30,16 +38,29 @@ const VitalsMonitor = () => {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
   const [vitalsHistory, setVitalsHistory] = useState<VitalsData[]>([]);
+  const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const { toast } = useToast();
 
   const handleVitalsUpdate = (newVitals: any) => {
-    setVitals(prev => ({
-      ...prev,
+    // Apply calibration if available
+    let calibratedVitals = {
       heartRate: newVitals.heartRate,
       spO2: newVitals.spO2,
       bloodSugar: newVitals.glucose,
       bloodViscosity: newVitals.viscosity
-    }));
+    };
+
+    if (calibrationData) {
+      // Apply linear calibration based on user's known values
+      if (newVitals.glucose && calibrationData.userGlucose) {
+        calibratedVitals.bloodSugar = calibrationData.userGlucose + (newVitals.glucose - calibrationData.userGlucose) * 0.8;
+      }
+      if (newVitals.viscosity && calibrationData.userViscosity) {
+        calibratedVitals.bloodViscosity = calibrationData.userViscosity + (newVitals.viscosity - calibrationData.userViscosity) * 0.8;
+      }
+    }
+
+    setVitals(prev => ({ ...prev, ...calibratedVitals }));
   };
 
   const handleBluetoothData = (data: { hr: number; spo2: number }) => {
@@ -54,6 +75,12 @@ const VitalsMonitor = () => {
     });
   };
 
+  const handleCalibrationUpdate = (newCalibrationData: CalibrationData) => {
+    setCalibrationData(newCalibrationData);
+    // Store calibration data locally
+    localStorage.setItem('sofowat_calibration', JSON.stringify(newCalibrationData));
+  };
+
   const saveVitalsToHistory = () => {
     if (vitals.heartRate || vitals.spO2 || vitals.bloodSugar) {
       const vitalsWithTimestamp = {
@@ -63,10 +90,22 @@ const VitalsMonitor = () => {
       setVitalsHistory(prev => [vitalsWithTimestamp, ...prev]);
       toast({
         title: "Vitals Saved",
-        description: "Your health data has been recorded."
+        description: "Your health data has been recorded with calibration applied."
       });
     }
   };
+
+  // Load calibration data on component mount
+  useEffect(() => {
+    const savedCalibration = localStorage.getItem('sofowat_calibration');
+    if (savedCalibration) {
+      try {
+        setCalibrationData(JSON.parse(savedCalibration));
+      } catch (error) {
+        console.error('Failed to load calibration data:', error);
+      }
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-4">
@@ -128,13 +167,16 @@ const VitalsMonitor = () => {
           </Card>
         </div>
 
+        {/* Manual Calibration */}
+        <ManualCalibration onCalibrationUpdate={handleCalibrationUpdate} />
+
         {/* Vitals Display */}
         <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center justify-between text-lg">
               <div className="flex items-center">
                 <Activity className="w-5 h-5 mr-2 text-blue-500" />
-                Vitals Summary
+                Vitals Summary {calibrationData && <span className="text-xs text-purple-600 ml-2">(Calibrated)</span>}
               </div>
               <Button 
                 onClick={saveVitalsToHistory}
@@ -168,7 +210,7 @@ const VitalsMonitor = () => {
                 <Activity className="w-6 h-6 text-green-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Blood Pressure</p>
                 <p className="text-xl font-bold text-green-600">
-                  {vitals.bloodPressure || '-- / -- mmHg'}
+                  {vitals.bloodPressure || calibrationData?.userBloodPressure || '-- / -- mmHg'}
                 </p>
               </div>
               
@@ -176,7 +218,7 @@ const VitalsMonitor = () => {
                 <Zap className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Blood Sugar</p>
                 <p className="text-xl font-bold text-yellow-600">
-                  {vitals.bloodSugar ? `${vitals.bloodSugar} mg/dL` : '-- mg/dL'}
+                  {vitals.bloodSugar ? `${vitals.bloodSugar.toFixed(1)} mg/dL` : '-- mg/dL'}
                 </p>
               </div>
               
@@ -184,7 +226,7 @@ const VitalsMonitor = () => {
                 <Droplets className="w-6 h-6 text-purple-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Blood Viscosity</p>
                 <p className="text-xl font-bold text-purple-600">
-                  {vitals.bloodViscosity ? `${vitals.bloodViscosity} mPa·s` : '-- mPa·s'}
+                  {vitals.bloodViscosity ? `${vitals.bloodViscosity.toFixed(2)} Pa·s` : '-- Pa·s'}
                 </p>
               </div>
             </div>
@@ -202,6 +244,7 @@ const VitalsMonitor = () => {
               <ul className="space-y-1 ml-4">
                 <li>• This device is for monitoring purposes only</li>
                 <li>• Not intended for medical diagnosis or treatment</li>
+                <li>• Manual calibration improves accuracy but does not guarantee medical precision</li>
                 <li>• Consult healthcare professionals for medical advice</li>
                 <li>• Keep data private and secure</li>
               </ul>

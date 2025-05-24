@@ -9,6 +9,36 @@ interface BluetoothConnectorProps {
   onConnectionChange: (connected: boolean) => void;
 }
 
+// Extend Navigator interface for Web Bluetooth API
+declare global {
+  interface Navigator {
+    bluetooth?: {
+      requestDevice(options?: any): Promise<BluetoothDevice>;
+    };
+  }
+}
+
+interface BluetoothDevice {
+  name?: string;
+  gatt?: {
+    connect(): Promise<BluetoothRemoteGATTServer>;
+  };
+  addEventListener(type: string, listener: EventListener): void;
+}
+
+interface BluetoothRemoteGATTServer {
+  getPrimaryService(service: string): Promise<BluetoothRemoteGATTService>;
+}
+
+interface BluetoothRemoteGATTService {
+  getCharacteristic(characteristic: string): Promise<BluetoothRemoteGATTCharacteristic>;
+}
+
+interface BluetoothRemoteGATTCharacteristic {
+  startNotifications(): Promise<void>;
+  addEventListener(type: string, listener: EventListener): void;
+}
+
 const BluetoothConnector = ({ onDataReceived, onConnectionChange }: BluetoothConnectorProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
