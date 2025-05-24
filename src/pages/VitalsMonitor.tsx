@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import VideoCapture from '../components/VideoCapture';
 import BluetoothConnector from '../components/BluetoothConnector';
 import VitalsHistory from '../components/VitalsHistory';
 import ManualCalibration from '../components/ManualCalibration';
-import VitalsDisplay from '../components/VitalsDisplay';
 import { useToast } from '@/hooks/use-toast';
 
 interface VitalsData {
@@ -47,8 +47,7 @@ const VitalsMonitor = () => {
       heartRate: newVitals.heartRate,
       spO2: newVitals.spO2,
       bloodSugar: newVitals.glucose,
-      bloodViscosity: newVitals.viscosity,
-      bloodPressure: newVitals.bloodPressure
+      bloodViscosity: newVitals.viscosity
     };
 
     if (calibrationData) {
@@ -154,7 +153,7 @@ const VitalsMonitor = () => {
                 onClick={() => setIsCameraActive(!isCameraActive)}
                 className={`w-full ${isCameraActive ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
               >
-                {isCameraActive ? 'Stop Camera Scan' : 'Start Camera Scan (10s with Flash)'}
+                {isCameraActive ? 'Stop Camera Scan' : 'Start Camera Scan'}
               </Button>
               {isCameraActive && (
                 <div className="mt-4">
@@ -177,7 +176,7 @@ const VitalsMonitor = () => {
             <CardTitle className="flex items-center justify-between text-lg">
               <div className="flex items-center">
                 <Activity className="w-5 h-5 mr-2 text-blue-500" />
-                Complete Health Report {calibrationData && <span className="text-xs text-purple-600 ml-2">(Calibrated)</span>}
+                Vitals Summary {calibrationData && <span className="text-xs text-purple-600 ml-2">(Calibrated)</span>}
               </div>
               <Button 
                 onClick={saveVitalsToHistory}
@@ -190,16 +189,47 @@ const VitalsMonitor = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <VitalsDisplay 
-              vitals={{
-                heartRate: vitals.heartRate,
-                spO2: vitals.spO2,
-                glucose: vitals.bloodSugar,
-                viscosity: vitals.bloodViscosity,
-                bloodPressure: vitals.bloodPressure
-              }}
-              isProcessing={isProcessing}
-            />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center p-4 bg-red-50 rounded-lg">
+                <Heart className="w-6 h-6 text-red-500 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Heart Rate</p>
+                <p className="text-xl font-bold text-red-600">
+                  {vitals.heartRate ? `${vitals.heartRate} bpm` : '-- bpm'}
+                </p>
+              </div>
+              
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <Droplets className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">SpO₂</p>
+                <p className="text-xl font-bold text-blue-600">
+                  {vitals.spO2 ? `${vitals.spO2}%` : '--%'}
+                </p>
+              </div>
+              
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <Activity className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Blood Pressure</p>
+                <p className="text-xl font-bold text-green-600">
+                  {vitals.bloodPressure || calibrationData?.userBloodPressure || '-- / -- mmHg'}
+                </p>
+              </div>
+              
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <Zap className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Blood Sugar</p>
+                <p className="text-xl font-bold text-yellow-600">
+                  {vitals.bloodSugar ? `${vitals.bloodSugar.toFixed(1)} mg/dL` : '-- mg/dL'}
+                </p>
+              </div>
+              
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <Droplets className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Blood Viscosity</p>
+                <p className="text-xl font-bold text-purple-600">
+                  {vitals.bloodViscosity ? `${vitals.bloodViscosity.toFixed(2)} Pa·s` : '-- Pa·s'}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

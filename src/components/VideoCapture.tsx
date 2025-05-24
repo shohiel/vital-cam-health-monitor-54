@@ -1,8 +1,7 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { processSignal } from '../utils/signalProcessor';
 import { Button } from '@/components/ui/button';
-import { Camera, CameraOff, Zap } from 'lucide-react';
+import { Camera, CameraOff } from 'lucide-react';
 
 interface VideoCaptureProps {
   onVitalsUpdate: (vitals: any) => void;
@@ -15,12 +14,9 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string>('');
-  const [timeRemaining, setTimeRemaining] = useState(10);
   
   const redValues = useRef<number[]>([]);
   const processingInterval = useRef<number>();
-  const recordingTimer = useRef<number>();
-  const countdownTimer = useRef<number>();
 
   const startCamera = async () => {
     try {
@@ -40,18 +36,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
         setStream(mediaStream);
         setIsActive(true);
         onProcessingChange(true);
-        
-        // Enable flash if available
-        const track = mediaStream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities();
-        if (capabilities.torch) {
-          await track.applyConstraints({
-            advanced: [{ torch: true }]
-          });
-        }
-        
         startProcessing();
-        startRecordingTimer();
       }
     } catch (err) {
       setError('Camera access denied or not available. Please check permissions.');
@@ -61,51 +46,15 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
 
   const stopCamera = () => {
     if (stream) {
-      // Turn off flash before stopping
-      const track = stream.getVideoTracks()[0];
-      track.applyConstraints({
-        advanced: [{ torch: false }]
-      }).catch(() => {});
-      
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
     if (processingInterval.current) {
       clearInterval(processingInterval.current);
     }
-    if (recordingTimer.current) {
-      clearTimeout(recordingTimer.current);
-    }
-    if (countdownTimer.current) {
-      clearInterval(countdownTimer.current);
-    }
     setIsActive(false);
     onProcessingChange(false);
     redValues.current = [];
-    setTimeRemaining(10);
-  };
-
-  const startRecordingTimer = () => {
-    setTimeRemaining(10);
-    
-    // Countdown timer
-    countdownTimer.current = window.setInterval(() => {
-      setTimeRemaining(prev => {
-        if (prev <= 1) {
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Auto-stop after 10 seconds
-    recordingTimer.current = window.setTimeout(() => {
-      stopCamera();
-      if (redValues.current.length >= 50) {
-        const vitals = processSignal(redValues.current);
-        onVitalsUpdate(vitals);
-      }
-    }, 10000);
   };
 
   const startProcessing = () => {
@@ -145,6 +94,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
     // Keep only last 256 samples (about 25 seconds at 10 FPS)
     if (redValues.current.length > 256) {
       redValues.current.shift();
+    }
+
+    // Process signal when we have enough data
+    if (redValues.current.length > 50) {
+      const vitals = processSignal(redValues.current);
+      onVitalsUpdate(vitals);
     }
   };
 
@@ -193,28 +148,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
       </div>
       
       {isActive && (
-        <>
-          <div className="absolute top-4 right-4">
-            <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
-              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Recording</span>
-            </div>
+        <div className="absolute top-4 right-4">
+          <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            <span>Recording</span>
           </div>
-          
-          <div className="absolute top-4 left-4">
-            <div className="flex items-center space-x-2 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm">
-              <Zap className="w-3 h-3" />
-              <span>Flash On</span>
-            </div>
-          </div>
-          
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <div className="bg-black bg-opacity-70 text-white px-4 py-2 rounded-lg text-center">
-              <div className="text-2xl font-bold">{timeRemaining}</div>
-              <div className="text-sm">seconds remaining</div>
-            </div>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
