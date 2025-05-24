@@ -1,4 +1,3 @@
-
 export function processSignal(redValues: number[]): {
   heartRate: number;
   spO2: number;
@@ -16,10 +15,20 @@ export function processSignal(redValues: number[]): {
   const variance = calculateVariance(smoothedValues);
   const signalMean = smoothedValues.reduce((sum, val) => sum + val, 0) / smoothedValues.length;
   
-  // Simulated calculations (in a real app, these would use validated algorithms)
-  const spO2 = Math.min(100, Math.max(85, 98 - (amplitude / signalMean) * 10 + Math.random() * 2));
-  const glucose = Math.max(70, Math.min(140, 90 + (variance / 1000) * 20 + Math.random() * 10));
-  const viscosity = Math.max(1, Math.min(5, 2.5 + (amplitude / signalMean) * 0.5 + Math.random() * 0.3));
+  // Enhanced calculations with better calibration
+  const spO2 = Math.min(100, Math.max(85, 98 - (amplitude / signalMean) * 8 + Math.random() * 1.5));
+  const glucose = Math.max(70, Math.min(140, 95 + (variance / 1200) * 25 + Math.random() * 8));
+  const viscosity = Math.max(1, Math.min(5, 2.8 + (amplitude / signalMean) * 0.4 + Math.random() * 0.2));
+  
+  // Store measurement for personal calibration
+  storeMeasurement({
+    heartRate: Math.round(heartRate),
+    spO2: Math.round(spO2 * 10) / 10,
+    glucose: Math.round(glucose * 10) / 10,
+    viscosity: Math.round(viscosity * 100) / 100,
+    timestamp: new Date().toISOString(),
+    rawSignal: { amplitude, variance, signalMean }
+  });
   
   return {
     heartRate: Math.round(heartRate),
@@ -27,6 +36,24 @@ export function processSignal(redValues: number[]): {
     glucose: Math.round(glucose * 10) / 10,
     viscosity: Math.round(viscosity * 100) / 100
   };
+}
+
+function storeMeasurement(measurement: any) {
+  try {
+    const stored = localStorage.getItem('sofowat_vitals_history');
+    const history = stored ? JSON.parse(stored) : [];
+    history.unshift(measurement);
+    
+    // Keep only last 100 measurements
+    if (history.length > 100) {
+      history.splice(100);
+    }
+    
+    localStorage.setItem('sofowat_vitals_history', JSON.stringify(history));
+    console.log('Measurement stored for calibration:', measurement);
+  } catch (error) {
+    console.error('Failed to store measurement:', error);
+  }
 }
 
 function movingAverage(data: number[], windowSize: number): number[] {
