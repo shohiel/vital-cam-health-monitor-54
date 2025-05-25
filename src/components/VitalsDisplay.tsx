@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Droplets, Activity, Zap } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -9,6 +10,8 @@ interface VitalsDisplayProps {
     spO2: number | null;
     glucose: number | null;
     viscosity: number | null;
+    systolic: number | null;
+    diastolic: number | null;
   };
   isProcessing: boolean;
 }
@@ -28,6 +31,13 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
     return 'text-red-500';
   };
 
+  const getBPColor = (systolic: number | null, diastolic: number | null) => {
+    if (!systolic || !diastolic) return 'text-gray-400';
+    if (systolic < 120 && diastolic < 80) return 'text-green-500';
+    if (systolic < 140 && diastolic < 90) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
   const vitalsConfig = [
     {
       key: 'heartRate',
@@ -36,8 +46,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       value: vitals.heartRate,
       unit: 'bpm',
       color: getHeartRateColor(vitals.heartRate),
-      range: [40, 120],
-      normalRange: [60, 100]
+      range: [40, 120] as [number, number],
+      normalRange: [60, 100] as [number, number]
     },
     {
       key: 'spO2',
@@ -46,8 +56,19 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       value: vitals.spO2,
       unit: '%',
       color: getSpO2Color(vitals.spO2),
-      range: [80, 100],
-      normalRange: [95, 100]
+      range: [80, 100] as [number, number],
+      normalRange: [95, 100] as [number, number]
+    },
+    {
+      key: 'bloodPressure',
+      title: 'Blood Pressure',
+      icon: Activity,
+      value: vitals.systolic && vitals.diastolic ? `${vitals.systolic}/${vitals.diastolic}` : null,
+      unit: 'mmHg',
+      color: getBPColor(vitals.systolic, vitals.diastolic),
+      range: [80, 180] as [number, number],
+      normalRange: [90, 140] as [number, number],
+      displayValue: vitals.systolic && vitals.diastolic ? vitals.systolic : null
     },
     {
       key: 'glucose',
@@ -56,8 +77,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       value: vitals.glucose,
       unit: 'mg/dL',
       color: vitals.glucose ? 'text-purple-500' : 'text-gray-400',
-      range: [70, 140],
-      normalRange: [80, 120]
+      range: [70, 140] as [number, number],
+      normalRange: [80, 120] as [number, number]
     },
     {
       key: 'viscosity',
@@ -66,8 +87,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       value: vitals.viscosity,
       unit: 'cP',
       color: vitals.viscosity ? 'text-indigo-500' : 'text-gray-400',
-      range: [1, 5],
-      normalRange: [1.5, 3.5]
+      range: [1, 5] as [number, number],
+      normalRange: [1.5, 3.5] as [number, number]
     }
   ];
 
@@ -93,15 +114,20 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
           <CardContent className="pt-0">
             <div className="flex items-center justify-between mb-2">
               <span className={`text-2xl font-bold ${vital.color}`}>
-                {vital.value ? vital.value.toFixed(1) : '--'}
+                {vital.key === 'bloodPressure' 
+                  ? (vital.value || '--/--')
+                  : vital.value 
+                    ? (typeof vital.value === 'number' ? vital.value.toFixed(1) : vital.value)
+                    : '--'
+                }
               </span>
               <span className="text-sm text-gray-500">{vital.unit}</span>
             </div>
             
-            {vital.value && (
+            {(vital.displayValue !== undefined ? vital.displayValue : vital.value) && (
               <div className="space-y-1">
                 <Progress 
-                  value={((vital.value - vital.range[0]) / (vital.range[1] - vital.range[0])) * 100}
+                  value={((typeof vital.value === 'number' ? vital.value : vital.displayValue || 0) - vital.range[0]) / (vital.range[1] - vital.range[0]) * 100}
                   className="h-2"
                 />
                 <div className="flex justify-between text-xs text-gray-400">

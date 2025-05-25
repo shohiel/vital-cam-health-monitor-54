@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+
+import React, { useEffect, useRef, useState } from 'react';
 import { processSignal } from '../utils/signalProcessor';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff } from 'lucide-react';
@@ -14,9 +15,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string>('');
+  const [timeRemaining, setTimeRemaining] = useState(10);
   
   const redValues = useRef<number[]>([]);
   const processingInterval = useRef<number>();
+  const recordingTimeout = useRef<number>();
+  const countdownInterval = useRef<number>();
 
   const startCamera = async () => {
     try {
@@ -37,6 +41,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
         setIsActive(true);
         onProcessingChange(true);
         startProcessing();
+        startRecordingTimer();
       }
     } catch (err) {
       setError('Camera access denied or not available. Please check permissions.');
@@ -52,9 +57,34 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
     if (processingInterval.current) {
       clearInterval(processingInterval.current);
     }
+    if (recordingTimeout.current) {
+      clearTimeout(recordingTimeout.current);
+    }
+    if (countdownInterval.current) {
+      clearInterval(countdownInterval.current);
+    }
     setIsActive(false);
+    setTimeRemaining(10);
     onProcessingChange(false);
     redValues.current = [];
+  };
+
+  const startRecordingTimer = () => {
+    setTimeRemaining(10);
+    
+    countdownInterval.current = window.setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          stopCamera();
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    recordingTimeout.current = window.setTimeout(() => {
+      stopCamera();
+    }, 10000);
   };
 
   const startProcessing = () => {
@@ -148,12 +178,19 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
       </div>
       
       {isActive && (
-        <div className="absolute top-4 right-4">
-          <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-            <span>Recording</span>
+        <>
+          <div className="absolute top-4 right-4">
+            <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+              <span>Recording</span>
+            </div>
           </div>
-        </div>
+          <div className="absolute top-4 left-4">
+            <div className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm">
+              {timeRemaining}s
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
