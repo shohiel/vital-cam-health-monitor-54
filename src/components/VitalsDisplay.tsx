@@ -38,6 +38,13 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
     return 'text-red-500';
   };
 
+  const getGlucoseColor = (glucose: number | null) => {
+    if (!glucose) return 'text-gray-400';
+    if (glucose >= 80 && glucose <= 120) return 'text-green-500';
+    if (glucose >= 70 && glucose <= 140) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
   const vitalsConfig = [
     {
       key: 'heartRate',
@@ -68,7 +75,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       color: getBPColor(vitals.systolic, vitals.diastolic),
       range: [80, 180] as [number, number],
       normalRange: [90, 140] as [number, number],
-      displayValue: vitals.systolic && vitals.diastolic ? vitals.systolic : null
+      displayValue: vitals.systolic && vitals.diastolic ? vitals.systolic : null,
+      subtitle: vitals.systolic && vitals.diastolic ? 'Dataset-based estimation' : null
     },
     {
       key: 'glucose',
@@ -76,8 +84,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       icon: Activity,
       value: vitals.glucose,
       unit: 'mg/dL',
-      color: vitals.glucose ? 'text-purple-500' : 'text-gray-400',
-      range: [70, 140] as [number, number],
+      color: getGlucoseColor(vitals.glucose),
+      range: [70, 200] as [number, number],
       normalRange: [80, 120] as [number, number]
     },
     {
@@ -87,8 +95,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       value: vitals.viscosity,
       unit: 'cP',
       color: vitals.viscosity ? 'text-indigo-500' : 'text-gray-400',
-      range: [1, 5] as [number, number],
-      normalRange: [1.5, 3.5] as [number, number]
+      range: [1, 8] as [number, number],
+      normalRange: [1.5, 4.5] as [number, number]
     }
   ];
 
@@ -100,7 +108,12 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
             <CardTitle className="flex items-center justify-between text-base">
               <div className="flex items-center">
                 <vital.icon className={`w-5 h-5 mr-2 ${vital.color}`} />
-                {vital.title}
+                <div>
+                  {vital.title}
+                  {vital.subtitle && (
+                    <div className="text-xs text-gray-500 font-normal">{vital.subtitle}</div>
+                  )}
+                </div>
               </div>
               {isProcessing && !vital.value && (
                 <div className="flex space-x-1">
@@ -142,6 +155,13 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
           </CardContent>
         </Card>
       ))}
+      
+      {isProcessing && (
+        <div className="text-center p-4 bg-blue-50 rounded-lg">
+          <div className="text-blue-600 font-medium">📊 Processing with dataset analysis...</div>
+          <div className="text-sm text-blue-500 mt-1">Enhanced accuracy with flash measurement</div>
+        </div>
+      )}
     </div>
   );
 };
