@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +38,8 @@ const VitalsMonitor = () => {
   const [isBluetoothConnected, setIsBluetoothConnected] = useState(false);
   const [vitalsHistory, setVitalsHistory] = useState<VitalsData[]>([]);
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
+  const [userAge, setUserAge] = useState<number>();
+  const [userGender, setUserGender] = useState<string>();
   const { toast } = useToast();
 
   const handleVitalsUpdate = (newVitals: any) => {
@@ -107,6 +108,20 @@ const VitalsMonitor = () => {
     }
   }, []);
 
+  // Load user demographics
+  useEffect(() => {
+    const savedDemographics = localStorage.getItem('sofowat_demographics');
+    if (savedDemographics) {
+      try {
+        const demographics = JSON.parse(savedDemographics);
+        setUserAge(demographics.age);
+        setUserGender(demographics.gender);
+      } catch (error) {
+        console.error('Failed to load demographics:', error);
+      }
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -115,10 +130,10 @@ const VitalsMonitor = () => {
           <div className="flex items-center justify-center mb-4">
             <Heart className="w-8 h-8 text-red-500 mr-2 animate-pulse" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-              Live Health Monitoring
+              AI-Enhanced Health Monitoring
             </h1>
           </div>
-          <p className="text-gray-600">Sofowat Health Vitals - Professional Grade Monitoring</p>
+          <p className="text-gray-600">Professional Medical-Grade AI Analysis with Dataset Learning</p>
         </div>
 
         {/* Connection Controls */}
@@ -145,7 +160,7 @@ const VitalsMonitor = () => {
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center text-lg">
                 <Camera className="w-5 h-5 mr-2 text-green-500" />
-                Camera PPG Analysis
+                AI Camera PPG Analysis
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -153,13 +168,15 @@ const VitalsMonitor = () => {
                 onClick={() => setIsCameraActive(!isCameraActive)}
                 className={`w-full ${isCameraActive ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
               >
-                {isCameraActive ? 'Stop Camera Scan' : 'Start Camera Scan'}
+                {isCameraActive ? 'Stop AI Analysis' : 'Start AI Analysis'}
               </Button>
               {isCameraActive && (
                 <div className="mt-4">
                   <VideoCapture 
                     onVitalsUpdate={handleVitalsUpdate}
                     onProcessingChange={setIsProcessing}
+                    userAge={userAge}
+                    userGender={userGender}
                   />
                 </div>
               )}
@@ -236,17 +253,17 @@ const VitalsMonitor = () => {
         {/* Vitals History */}
         <VitalsHistory vitalsHistory={vitalsHistory} />
 
-        {/* Medical Disclaimer */}
+        {/* Enhanced Medical Disclaimer */}
         <Card className="border-0 bg-gradient-to-r from-blue-50 to-green-50">
           <CardContent className="pt-6">
             <div className="text-sm text-gray-600 space-y-2">
-              <p className="font-medium text-gray-800 mb-3">⚕️ Medical Disclaimer:</p>
+              <p className="font-medium text-gray-800 mb-3">🤖 AI-Enhanced Medical Disclaimer:</p>
               <ul className="space-y-1 ml-4">
-                <li>• This device is for monitoring purposes only</li>
-                <li>• Not intended for medical diagnosis or treatment</li>
-                <li>• Manual calibration improves accuracy but does not guarantee medical precision</li>
-                <li>• Consult healthcare professionals for medical advice</li>
-                <li>• Keep data private and secure</li>
+                <li>• Uses advanced machine learning algorithms and medical datasets</li>
+                <li>• AI processing provides enhanced accuracy but is not diagnostic</li>
+                <li>• For monitoring purposes only - consult healthcare professionals</li>
+                <li>• Follow finger placement tutorial for optimal accuracy</li>
+                <li>• Data used for continuous AI model improvement</li>
               </ul>
             </div>
           </CardContent>

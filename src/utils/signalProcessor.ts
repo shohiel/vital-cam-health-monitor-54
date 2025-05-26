@@ -1,52 +1,26 @@
-export function processSignal(redValues: number[]): {
+import { processSignalWithAI } from './advancedSignalProcessor';
+
+export function processSignal(redValues: number[], userAge?: number, userGender?: string): {
   heartRate: number;
   spO2: number;
   glucose: number;
   viscosity: number;
   systolic: number;
   diastolic: number;
+  confidence?: number;
+  accuracy?: number;
 } {
-  // Apply enhanced filtering for flash-based measurements
-  const smoothedValues = enhancedFilter(redValues);
+  // Use advanced AI/ML processing for enhanced accuracy
+  const aiResults = processSignalWithAI(redValues, userAge, userGender);
   
-  // Calculate heart rate using improved peak detection
-  const heartRate = calculateHeartRate(smoothedValues);
-  
-  // Enhanced signal characteristics for dataset-based estimation
-  const amplitude = Math.max(...smoothedValues) - Math.min(...smoothedValues);
-  const variance = calculateVariance(smoothedValues);
-  const signalMean = smoothedValues.reduce((sum, val) => sum + val, 0) / smoothedValues.length;
-  const pulseAmplitude = calculatePulseAmplitude(smoothedValues);
-  const signalQuality = calculateSignalQuality(smoothedValues);
-  
-  // Dataset-based blood pressure estimation with ML-like approach
-  const bloodPressure = estimateBloodPressureFromDataset(smoothedValues, heartRate, amplitude, variance);
-  
-  // Enhanced calculations with dataset calibration
-  const spO2 = Math.min(100, Math.max(85, 98.5 - (amplitude / signalMean) * 6 + (signalQuality * 2)));
-  const glucose = Math.max(70, Math.min(200, 95 + (variance / 800) * 20 + (pulseAmplitude * 15)));
-  const viscosity = Math.max(1, Math.min(8, 2.8 + (amplitude / signalMean) * 0.8 + (variance / 1000)));
-  
-  // Store measurement for continuous learning
-  storeMeasurement({
-    heartRate: Math.round(heartRate),
-    spO2: Math.round(spO2 * 10) / 10,
-    glucose: Math.round(glucose * 10) / 10,
-    viscosity: Math.round(viscosity * 100) / 100,
-    systolic: Math.round(bloodPressure.systolic),
-    diastolic: Math.round(bloodPressure.diastolic),
-    timestamp: new Date().toISOString(),
-    signalMetrics: { amplitude, variance, signalMean, pulseAmplitude, signalQuality }
+  // Log advanced metrics for debugging
+  console.log('AI/ML Enhanced Results:', {
+    ...aiResults,
+    signalLength: redValues.length,
+    timestamp: new Date().toISOString()
   });
   
-  return {
-    heartRate: Math.round(heartRate),
-    spO2: Math.round(spO2 * 10) / 10,
-    glucose: Math.round(glucose * 10) / 10,
-    viscosity: Math.round(viscosity * 100) / 100,
-    systolic: Math.round(bloodPressure.systolic),
-    diastolic: Math.round(bloodPressure.diastolic)
-  };
+  return aiResults;
 }
 
 function estimateBloodPressureFromDataset(signal: number[], heartRate: number, amplitude: number, variance: number): { systolic: number; diastolic: number } {
