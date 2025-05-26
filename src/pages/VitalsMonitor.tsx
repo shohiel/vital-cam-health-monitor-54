@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,7 +40,6 @@ const VitalsMonitor = () => {
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null);
   const [userAge, setUserAge] = useState<number>();
   const [userGender, setUserGender] = useState<string>();
-  const [shouldStartTest, setShouldStartTest] = useState(false);
   const { toast } = useToast();
 
   const handleVitalsUpdate = (newVitals: any) => {
@@ -82,31 +80,6 @@ const VitalsMonitor = () => {
     setCalibrationData(newCalibrationData);
     // Store calibration data locally
     localStorage.setItem('sofowat_calibration', JSON.stringify(newCalibrationData));
-    
-    // Prompt user to test immediately for reference
-    setShouldStartTest(true);
-    toast({
-      title: "Calibration Saved",
-      description: "Please start a test immediately for calibration reference",
-      action: (
-        <Button 
-          onClick={startImmediateTest}
-          size="sm"
-          className="bg-green-500 hover:bg-green-600"
-        >
-          Start Test Now
-        </Button>
-      )
-    });
-  };
-
-  const startImmediateTest = () => {
-    setShouldStartTest(false);
-    setIsCameraActive(true);
-    toast({
-      title: "Calibration Test Started",
-      description: "Testing with your calibration data for improved accuracy"
-    });
   };
 
   const saveVitalsToHistory = () => {
@@ -211,6 +184,9 @@ const VitalsMonitor = () => {
           </Card>
         </div>
 
+        {/* Manual Calibration */}
+        <ManualCalibration onCalibrationUpdate={handleCalibrationUpdate} />
+
         {/* Vitals Display */}
         <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg">
           <CardHeader className="pb-4">
@@ -274,9 +250,6 @@ const VitalsMonitor = () => {
           </CardContent>
         </Card>
 
-        {/* Manual Calibration - Moved below vitals display */}
-        <ManualCalibration onCalibrationUpdate={handleCalibrationUpdate} />
-
         {/* Vitals History */}
         <VitalsHistory vitalsHistory={vitalsHistory} />
 
@@ -291,7 +264,6 @@ const VitalsMonitor = () => {
                 <li>• For monitoring purposes only - consult healthcare professionals</li>
                 <li>• Follow finger placement tutorial for optimal accuracy</li>
                 <li>• Data used for continuous AI model improvement</li>
-                <li>• Manual calibration improves personalized accuracy</li>
               </ul>
             </div>
           </CardContent>

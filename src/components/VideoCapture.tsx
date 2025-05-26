@@ -1,5 +1,6 @@
+
 import React, { useEffect, useRef, useState } from 'react';
-import { processSignalWithAI } from '../utils/advancedSignalProcessor';
+import { processSignal } from '../utils/signalProcessor';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, Zap, Info } from 'lucide-react';
 import TutorialVideo from './TutorialVideo';
@@ -27,7 +28,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string>('');
-  const [timeRemaining, setTimeRemaining] = useState(15); // Extended to 15 seconds
+  const [timeRemaining, setTimeRemaining] = useState(10);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [signalQuality, setSignalQuality] = useState(0);
@@ -130,31 +131,31 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     }
     
     setIsActive(false);
-    setTimeRemaining(15); // Reset to 15 seconds
+    setTimeRemaining(10);
     setMeasurementComplete(true);
     onProcessingChange(false);
     redValues.current = [];
     
-    console.log('Extended measurement completed - flash and camera turned off');
+    console.log('Measurement completed - flash and camera turned off');
   };
 
   const startRecordingTimer = () => {
-    setTimeRemaining(15); // Extended time for better accuracy
+    setTimeRemaining(10);
     
     countdownInterval.current = window.setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
           stopCamera();
-          return 15;
+          return 10;
         }
         return prev - 1;
       });
     }, 1000);
 
-    // Automatically stop after exactly 15 seconds for optimal accuracy
+    // Automatically stop after exactly 10 seconds for optimal accuracy
     recordingTimeout.current = window.setTimeout(() => {
       stopCamera();
-    }, 15000);
+    }, 10000);
   };
 
   const startProcessing = () => {
@@ -217,14 +218,14 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     
     redValues.current.push(ppgSignal);
     
-    // Keep samples for 15 seconds at 30 FPS (450 samples)
-    if (redValues.current.length > 450) {
+    // Keep samples for 10 seconds at 30 FPS (300 samples)
+    if (redValues.current.length > 300) {
       redValues.current.shift();
     }
 
     // Process with enhanced accuracy when sufficient data available
-    if (redValues.current.length > 120) { // Minimum 4 seconds for accuracy
-      const vitals = processSignalWithAI(redValues.current, userAge, userGender);
+    if (redValues.current.length > 90) { // Minimum 3 seconds for accuracy
+      const vitals = processSignal(redValues.current, userAge, userGender);
       setSignalQuality(vitals.confidence || 0);
       setAccuracy(vitals.accuracy || 0);
       onVitalsUpdate(vitals);
@@ -279,8 +280,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-white text-xl">✓</span>
             </div>
-            <p className="text-green-700 font-medium">Extended Measurement Complete!</p>
-            <p className="text-green-600 text-sm">15-second analysis for enhanced accuracy</p>
+            <p className="text-green-700 font-medium">Measurement Complete!</p>
+            <p className="text-green-600 text-sm">Flash and camera automatically turned off</p>
           </div>
         </div>
       )}
@@ -299,7 +300,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start Enhanced Analysis
+            Start Medical Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
@@ -314,7 +315,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Extended Recording</span>
+              <span>Medical Recording</span>
               {isFlashOn && <Zap className="w-3 h-3" />}
             </div>
           </div>
@@ -326,7 +327,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
             <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded">
               <div className="font-medium">
-                {isFlashOn ? '🔬 Enhanced Flash Mode (15s)' : '🔬 Extended Medical Mode (15s)'}
+                {isFlashOn ? '🔬 Medical Flash Mode' : '🔬 Enhanced Medical Mode'}
               </div>
               {signalQuality > 0 && (
                 <div className="text-xs mt-1">
