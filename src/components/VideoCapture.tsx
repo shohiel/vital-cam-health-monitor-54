@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { processSignal } from '../utils/signalProcessor';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,16 @@ import { Camera, CameraOff, Zap } from 'lucide-react';
 interface VideoCaptureProps {
   onVitalsUpdate: (vitals: any) => void;
   onProcessingChange: (processing: boolean) => void;
+}
+
+// Extend MediaTrackCapabilities to include torch
+interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+// Extend MediaTrackConstraintSet to include torch
+interface ExtendedMediaTrackConstraintSet extends MediaTrackConstraintSet {
+  torch?: boolean;
 }
 
 const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps) => {
@@ -41,7 +52,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
         setIsActive(true);
         onProcessingChange(true);
         
-        // Turn on flash/torch
+        // Turn on flash/torch for better PPG signal
         await enableFlash(mediaStream);
         
         startProcessing();
@@ -56,19 +67,22 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
   const enableFlash = async (mediaStream: MediaStream) => {
     try {
       const videoTrack = mediaStream.getVideoTracks()[0];
-      const capabilities = videoTrack.getCapabilities();
+      const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
       
       if (capabilities.torch) {
         await videoTrack.applyConstraints({
-          advanced: [{ torch: true }]
+          advanced: [{ torch: true } as ExtendedMediaTrackConstraintSet]
         });
         setIsFlashOn(true);
-        console.log('Flash/torch enabled for PPG measurement');
+        console.log('Flash/torch enabled for enhanced PPG measurement');
       } else {
-        console.log('Torch not supported on this device');
+        console.log('Torch not supported on this device - using standard camera mode');
+        // Even without torch, we can still measure effectively
+        setIsFlashOn(false);
       }
     } catch (error) {
       console.error('Failed to enable flash:', error);
+      setIsFlashOn(false);
     }
   };
 
@@ -77,7 +91,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
       try {
         const videoTrack = stream.getVideoTracks()[0];
         await videoTrack.applyConstraints({
-          advanced: [{ torch: false }]
+          advanced: [{ torch: false } as ExtendedMediaTrackConstraintSet]
         });
         setIsFlashOn(false);
         console.log('Flash/torch disabled');
@@ -151,7 +165,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    // Extract red channel average with enhanced processing
+    // Enhanced signal extraction for flash-based measurement
     let totalRed = 0;
     let totalGreen = 0;
     let totalBlue = 0;
@@ -165,10 +179,9 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
     
     const avgRed = totalRed / pixelCount;
     const avgGreen = totalGreen / pixelCount;
-    const avgBlue = totalBlue / pixelCount;
     
-    // Use red-green ratio for better PPG signal with flash
-    const ppgSignal = avgRed / (avgGreen + 1);
+    // Enhanced PPG signal processing with flash optimization
+    const ppgSignal = isFlashOn ? avgRed / (avgGreen + 1) : avgRed;
     redValues.current.push(ppgSignal);
     
     // Keep samples for 10 seconds at 30 FPS (300 samples)
@@ -217,7 +230,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start Flash Analysis
+            Start Flash BP Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
@@ -232,7 +245,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Recording</span>
+              <span>Recording BP</span>
               {isFlashOn && <Zap className="w-3 h-3" />}
             </div>
           </div>
@@ -243,7 +256,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange }: VideoCaptureProps)
           </div>
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
             <div className="text-white text-center text-sm bg-black bg-opacity-50 px-3 py-1 rounded">
-              {isFlashOn ? '🔦 Flash Active' : '📷 Camera Mode'}
+              {isFlashOn ? '🔦 Flash BP Mode' : '📷 Standard BP Mode'}
             </div>
           </div>
         </>
