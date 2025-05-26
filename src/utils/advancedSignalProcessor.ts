@@ -120,6 +120,100 @@ const ENHANCED_MEDICAL_DATASET: DatasetPattern[] = [
   }
 ];
 
+// Utility functions implementation
+export function calculateSkewness(data: number[], mean: number, stdDev: number): number {
+  if (stdDev === 0) return 0;
+  
+  const n = data.length;
+  let sum = 0;
+  
+  for (const value of data) {
+    sum += Math.pow((value - mean) / stdDev, 3);
+  }
+  
+  return (n / ((n - 1) * (n - 2))) * sum;
+}
+
+export function calculateKurtosis(data: number[], mean: number, stdDev: number): number {
+  if (stdDev === 0) return 0;
+  
+  const n = data.length;
+  let sum = 0;
+  
+  for (const value of data) {
+    sum += Math.pow((value - mean) / stdDev, 4);
+  }
+  
+  const kurtosis = (n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3)) * sum;
+  const correction = (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3));
+  
+  return kurtosis - correction;
+}
+
+export function calculateSpectralCentroid(spectrum: number[]): number {
+  let weightedSum = 0;
+  let totalPower = 0;
+  
+  for (let i = 0; i < spectrum.length; i++) {
+    weightedSum += i * spectrum[i];
+    totalPower += spectrum[i];
+  }
+  
+  return totalPower > 0 ? weightedSum / totalPower : 0;
+}
+
+export function findDominantFrequency(spectrum: number[]): number {
+  let maxPower = 0;
+  let dominantFreq = 0;
+  
+  for (let i = 1; i < spectrum.length; i++) {
+    if (spectrum[i] > maxPower) {
+      maxPower = spectrum[i];
+      dominantFreq = i;
+    }
+  }
+  
+  // Convert to physiological frequency (assuming 30 FPS sampling)
+  return (dominantFreq * 30) / (spectrum.length * 2) / 60; // Convert to Hz, then to beats per second
+}
+
+export function calculateZeroCrossingRate(data: number[]): number {
+  if (data.length < 2) return 0;
+  
+  const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
+  const centeredData = data.map(val => val - mean);
+  
+  let crossings = 0;
+  for (let i = 1; i < centeredData.length; i++) {
+    if ((centeredData[i] > 0 && centeredData[i-1] <= 0) || 
+        (centeredData[i] <= 0 && centeredData[i-1] > 0)) {
+      crossings++;
+    }
+  }
+  
+  return crossings / (data.length - 1);
+}
+
+export function calculateDemographicSimilarity(
+  userDemo: { age?: number; gender?: string },
+  patternDemo: DatasetPattern['demographics']
+): number {
+  let similarity = 0.5; // Base similarity
+  
+  if (userDemo.age && patternDemo.age) {
+    const ageDiff = Math.abs(userDemo.age - patternDemo.age);
+    const ageScore = Math.max(0, 1 - ageDiff / 50); // Normalize age difference
+    similarity += ageScore * 0.3;
+  }
+  
+  if (userDemo.gender && patternDemo.gender) {
+    const genderScore = userDemo.gender.toLowerCase() === patternDemo.gender.toLowerCase() ? 1 : 0.3;
+    similarity += genderScore * 0.2;
+  }
+  
+  return Math.min(1, similarity);
+}
+
 export function processSignalWithAI(redValues: number[], userAge?: number, userGender?: string): {
   heartRate: number;
   spO2: number;
