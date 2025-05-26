@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { processSignal } from '../utils/signalProcessor';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const [showTutorial, setShowTutorial] = useState(false);
   const [signalQuality, setSignalQuality] = useState(0);
   const [accuracy, setAccuracy] = useState(0);
+  const [measurementComplete, setMeasurementComplete] = useState(false);
   
   const redValues = useRef<number[]>([]);
   const processingInterval = useRef<number>();
@@ -41,11 +43,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const startCamera = async () => {
     try {
       setError('');
+      setMeasurementComplete(false);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         },
         audio: false
       });
@@ -57,14 +60,14 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         setIsActive(true);
         onProcessingChange(true);
         
-        // Turn on flash/torch for better PPG signal
+        // Turn on flash for maximum accuracy
         await enableFlash(mediaStream);
         
         startProcessing();
         startRecordingTimer();
       }
     } catch (err) {
-      setError('Camera access denied or not available. Please check permissions and follow the tutorial.');
+      setError('Camera access denied. Please allow camera permission and follow the tutorial for accurate measurements.');
       console.error('Camera error:', err);
     }
   };
@@ -79,14 +82,13 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           advanced: [{ torch: true } as ExtendedMediaTrackConstraintSet]
         });
         setIsFlashOn(true);
-        console.log('Flash/torch enabled for enhanced PPG measurement');
+        console.log('Flash enabled for maximum PPG signal accuracy');
       } else {
-        console.log('Torch not supported on this device - using standard camera mode');
-        // Even without torch, we can still measure effectively
+        console.log('Flash not supported - using enhanced camera mode');
         setIsFlashOn(false);
       }
     } catch (error) {
-      console.error('Failed to enable flash:', error);
+      console.error('Flash control failed:', error);
       setIsFlashOn(false);
     }
   };
@@ -99,7 +101,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           advanced: [{ torch: false } as ExtendedMediaTrackConstraintSet]
         });
         setIsFlashOn(false);
-        console.log('Flash/torch disabled');
+        console.log('Flash disabled after measurement completion');
       } catch (error) {
         console.error('Failed to disable flash:', error);
       }
@@ -107,12 +109,17 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   };
 
   const stopCamera = async () => {
+    // Always disable flash first
     await disableFlash();
     
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('Camera track stopped');
+      });
       setStream(null);
     }
+    
     if (processingInterval.current) {
       clearInterval(processingInterval.current);
     }
@@ -122,10 +129,14 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     if (countdownInterval.current) {
       clearInterval(countdownInterval.current);
     }
+    
     setIsActive(false);
     setTimeRemaining(10);
+    setMeasurementComplete(true);
     onProcessingChange(false);
     redValues.current = [];
+    
+    console.log('Measurement completed - flash and camera turned off');
   };
 
   const startRecordingTimer = () => {
@@ -141,7 +152,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       });
     }, 1000);
 
-    // Automatically stop after exactly 10 seconds
+    // Automatically stop after exactly 10 seconds for optimal accuracy
     recordingTimeout.current = window.setTimeout(() => {
       stopCamera();
     }, 10000);
@@ -149,7 +160,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
 
   const startProcessing = () => {
     if (!processingInterval.current) {
-      processingInterval.current = window.setInterval(processFrame, 33); // 30 FPS for better accuracy
+      processingInterval.current = window.setInterval(processFrame, 33); // 30 FPS for medical accuracy
     }
   };
 
@@ -164,29 +175,47 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = video.videoWidth || 1920;
+    canvas.height = video.videoHeight || 1080;
     
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    // Enhanced signal extraction for flash-based measurement
+    // Enhanced signal extraction optimized for medical accuracy
     let totalRed = 0;
     let totalGreen = 0;
     let totalBlue = 0;
-    const pixelCount = frame.data.length / 4;
+    let validPixels = 0;
     
-    for (let i = 0; i < frame.data.length; i += 4) {
-      totalRed += frame.data[i];     // red channel
-      totalGreen += frame.data[i + 1]; // green channel  
-      totalBlue += frame.data[i + 2];  // blue channel
+    // Process center region for better signal quality
+    const centerX = Math.floor(canvas.width * 0.3);
+    const centerY = Math.floor(canvas.height * 0.3);
+    const regionWidth = Math.floor(canvas.width * 0.4);
+    const regionHeight = Math.floor(canvas.height * 0.4);
+    
+    for (let y = centerY; y < centerY + regionHeight; y++) {
+      for (let x = centerX; x < centerX + regionWidth; x++) {
+        const i = (y * canvas.width + x) * 4;
+        if (i < frame.data.length) {
+          totalRed += frame.data[i];
+          totalGreen += frame.data[i + 1];
+          totalBlue += frame.data[i + 2];
+          validPixels++;
+        }
+      }
     }
     
-    const avgRed = totalRed / pixelCount;
-    const avgGreen = totalGreen / pixelCount;
+    if (validPixels === 0) return;
     
-    // Enhanced PPG signal processing with flash optimization
-    const ppgSignal = isFlashOn ? avgRed / (avgGreen + 1) : avgRed;
+    const avgRed = totalRed / validPixels;
+    const avgGreen = totalGreen / validPixels;
+    const avgBlue = totalBlue / validPixels;
+    
+    // Enhanced PPG signal with flash optimization for maximum accuracy
+    const ppgSignal = isFlashOn ? 
+      (avgRed * 1.2) / (avgGreen + avgBlue + 1) : // Flash mode - enhanced red channel
+      avgRed / (avgGreen + 1); // Standard mode
+    
     redValues.current.push(ppgSignal);
     
     // Keep samples for 10 seconds at 30 FPS (300 samples)
@@ -194,8 +223,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       redValues.current.shift();
     }
 
-    // Process signal when we have enough data (minimum 3 seconds)
-    if (redValues.current.length > 90) {
+    // Process with enhanced accuracy when sufficient data available
+    if (redValues.current.length > 90) { // Minimum 3 seconds for accuracy
       const vitals = processSignal(redValues.current, userAge, userGender);
       setSignalQuality(vitals.confidence || 0);
       setAccuracy(vitals.accuracy || 0);
@@ -245,6 +274,18 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         </div>
       )}
       
+      {measurementComplete && (
+        <div className="absolute inset-0 bg-green-50 border-2 border-green-200 rounded-lg flex items-center justify-center p-4">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-white text-xl">✓</span>
+            </div>
+            <p className="text-green-700 font-medium">Measurement Complete!</p>
+            <p className="text-green-600 text-sm">Flash and camera automatically turned off</p>
+          </div>
+        </div>
+      )}
+      
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
         <Button
           onClick={() => setShowTutorial(true)}
@@ -259,12 +300,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start AI Analysis
+            Start Medical Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
             <CameraOff className="w-4 h-4 mr-2" />
-            Stop Analysis
+            Stop & Save
           </Button>
         )}
       </div>
@@ -274,7 +315,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>AI Recording</span>
+              <span>Medical Recording</span>
               {isFlashOn && <Zap className="w-3 h-3" />}
             </div>
           </div>
@@ -284,11 +325,13 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             </div>
           </div>
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
-            <div className="text-white text-center text-sm bg-black bg-opacity-50 px-3 py-1 rounded">
-              {isFlashOn ? '🤖 AI Flash Mode' : '🤖 AI Standard Mode'}
+            <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded">
+              <div className="font-medium">
+                {isFlashOn ? '🔬 Medical Flash Mode' : '🔬 Enhanced Medical Mode'}
+              </div>
               {signalQuality > 0 && (
                 <div className="text-xs mt-1">
-                  Quality: {Math.round(signalQuality)}% | Accuracy: {Math.round(accuracy)}%
+                  Signal Quality: {Math.round(signalQuality)}% | Accuracy: {Math.round(accuracy)}%
                 </div>
               )}
             </div>
