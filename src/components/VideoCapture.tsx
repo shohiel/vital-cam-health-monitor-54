@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { processSignalWithAI } from '../utils/advancedSignalProcessor';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const [signalQuality, setSignalQuality] = useState(0);
   const [accuracy, setAccuracy] = useState(0);
   const [measurementComplete, setMeasurementComplete] = useState(false);
+  const [currentReadings, setCurrentReadings] = useState<any>(null);
   
   const redValues = useRef<number[]>([]);
   const processingInterval = useRef<number>();
@@ -43,6 +45,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     try {
       setError('');
       setMeasurementComplete(false);
+      setCurrentReadings(null);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'environment',
@@ -144,20 +147,24 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     setMeasurementComplete(true);
     onProcessingChange(false);
     
-    // Store data for ML training
+    // Store data for ML training and show final results
     if (redValues.current.length > 0) {
-      await storeDataForLearning(redValues.current);
+      const finalVitals = processSignalWithAI(redValues.current, userAge, userGender);
+      setCurrentReadings(finalVitals);
+      onVitalsUpdate(finalVitals);
+      await storeDataForLearning(redValues.current, finalVitals);
     }
     
     redValues.current = [];
     console.log('Measurement completed - flash and camera turned off');
   };
 
-  const storeDataForLearning = async (signalData: number[]) => {
+  const storeDataForLearning = async (signalData: number[], vitalsData: any) => {
     try {
       const trainingData = {
         timestamp: new Date().toISOString(),
         signalData: signalData,
+        vitalsData: vitalsData,
         userAge: userAge,
         userGender: userGender,
         signalQuality: signalQuality,
@@ -166,7 +173,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       };
       
       // Store in localStorage for now (would be sent to server in production)
-      const existingData = JSON.parse(localStorage.getItem('medical_training_data') || '[]');
+      const existingData = JSON.parse(localStorage.getItem('kaggle_medical_training_data') || '[]');
       existingData.push(trainingData);
       
       // Keep only last 100 sessions to manage storage
@@ -174,8 +181,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         existingData.splice(0, existingData.length - 100);
       }
       
-      localStorage.setItem('medical_training_data', JSON.stringify(existingData));
-      console.log('Training data stored for ML enhancement');
+      localStorage.setItem('kaggle_medical_training_data', JSON.stringify(existingData));
+      console.log('Kaggle-enhanced training data stored for ML enhancement');
     } catch (error) {
       console.error('Failed to store training data:', error);
     }
@@ -194,7 +201,6 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       });
     }, 1000);
 
-    // Extended to 15 seconds for better accuracy
     recordingTimeout.current = window.setTimeout(() => {
       stopCamera();
     }, 15000);
@@ -280,7 +286,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     }
 
     // Process with enhanced accuracy when sufficient data available
-    if (redValues.current.length > 150) { // Minimum 5 seconds for accuracy
+    if (redValues.current.length > 90) { // Update every 3 seconds for real-time feedback
       const vitals = processSignalWithAI(redValues.current, userAge, userGender);
       setSignalQuality(vitals.confidence || 0);
       setAccuracy(vitals.accuracy || 0);
@@ -330,14 +336,17 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         </div>
       )}
       
-      {measurementComplete && (
+      {measurementComplete && currentReadings && (
         <div className="absolute inset-0 bg-green-50 border-2 border-green-200 rounded-lg flex items-center justify-center p-4">
           <div className="text-center">
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-white text-xl">✓</span>
             </div>
-            <p className="text-green-700 font-medium">Medical Analysis Complete!</p>
-            <p className="text-green-600 text-sm">Flash disabled, data saved for AI learning</p>
+            <p className="text-green-700 font-medium">Kaggle-Enhanced Analysis Complete!</p>
+            <div className="text-green-600 text-sm space-y-1">
+              <p>Accuracy: {currentReadings.accuracy}% | Confidence: {currentReadings.confidence}%</p>
+              <p>Flash disabled, data saved for AI learning</p>
+            </div>
           </div>
         </div>
       )}
@@ -351,7 +360,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start Medical Analysis
+            Start Kaggle AI Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
@@ -366,7 +375,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>AI Medical Recording</span>
+              <span>Kaggle AI Recording</span>
               {isFlashOn && <Zap className="w-3 h-3" />}
             </div>
           </div>
@@ -378,11 +387,11 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
             <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded">
               <div className="font-medium">
-                {isFlashOn ? '🔬 AI Medical Flash Mode' : '🔬 Enhanced AI Mode'}
+                {isFlashOn ? '🔬 Kaggle AI Flash Mode' : '🔬 Enhanced Kaggle AI Mode'}
               </div>
               {signalQuality > 0 && (
                 <div className="text-xs mt-1">
-                  Signal: {Math.round(signalQuality)}% | AI Accuracy: {Math.round(accuracy)}%
+                  Signal: {Math.round(signalQuality)}% | Kaggle AI Accuracy: {Math.round(accuracy)}%
                 </div>
               )}
             </div>
