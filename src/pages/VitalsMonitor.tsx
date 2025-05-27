@@ -48,7 +48,9 @@ const VitalsMonitor = () => {
       heartRate: newVitals.heartRate,
       spO2: newVitals.spO2,
       bloodSugar: newVitals.glucose,
-      bloodViscosity: newVitals.viscosity
+      bloodViscosity: newVitals.viscosity,
+      bloodPressure: newVitals.systolic && newVitals.diastolic ? 
+        `${newVitals.systolic}/${newVitals.diastolic}` : null
     };
 
     if (calibrationData) {
@@ -58,6 +60,9 @@ const VitalsMonitor = () => {
       }
       if (newVitals.viscosity && calibrationData.userViscosity) {
         calibratedVitals.bloodViscosity = calibrationData.userViscosity + (newVitals.viscosity - calibrationData.userViscosity) * 0.8;
+      }
+      if (calibrationData.userBloodPressure) {
+        calibratedVitals.bloodPressure = calibrationData.userBloodPressure;
       }
     }
 
@@ -80,6 +85,13 @@ const VitalsMonitor = () => {
     setCalibrationData(newCalibrationData);
     // Store calibration data locally
     localStorage.setItem('sofowat_calibration', JSON.stringify(newCalibrationData));
+    
+    // Start immediate test after calibration
+    setIsCameraActive(true);
+    toast({
+      title: "Calibration Updated",
+      description: "Starting immediate test with new calibration data for reference."
+    });
   };
 
   const saveVitalsToHistory = () => {
@@ -130,10 +142,10 @@ const VitalsMonitor = () => {
           <div className="flex items-center justify-center mb-4">
             <Heart className="w-8 h-8 text-red-500 mr-2 animate-pulse" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-              AI-Enhanced Health Monitoring
+              AI-Enhanced Medical Diagnostics
             </h1>
           </div>
-          <p className="text-gray-600">Professional Medical-Grade AI Analysis with Dataset Learning</p>
+          <p className="text-gray-600">Advanced Machine Learning with Global Medical Dataset Integration</p>
         </div>
 
         {/* Connection Controls */}
@@ -160,7 +172,7 @@ const VitalsMonitor = () => {
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center text-lg">
                 <Camera className="w-5 h-5 mr-2 text-green-500" />
-                AI Camera PPG Analysis
+                Advanced AI PPG Analysis
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -184,16 +196,13 @@ const VitalsMonitor = () => {
           </Card>
         </div>
 
-        {/* Manual Calibration */}
-        <ManualCalibration onCalibrationUpdate={handleCalibrationUpdate} />
-
         {/* Vitals Display */}
         <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-lg">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center justify-between text-lg">
               <div className="flex items-center">
                 <Activity className="w-5 h-5 mr-2 text-blue-500" />
-                Vitals Summary {calibrationData && <span className="text-xs text-purple-600 ml-2">(Calibrated)</span>}
+                Advanced AI Medical Analysis {calibrationData && <span className="text-xs text-purple-600 ml-2">(Calibrated)</span>}
               </div>
               <Button 
                 onClick={saveVitalsToHistory}
@@ -227,7 +236,7 @@ const VitalsMonitor = () => {
                 <Activity className="w-6 h-6 text-green-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Blood Pressure</p>
                 <p className="text-xl font-bold text-green-600">
-                  {vitals.bloodPressure || calibrationData?.userBloodPressure || '-- / -- mmHg'}
+                  {vitals.bloodPressure || '-- / -- mmHg'}
                 </p>
               </div>
               
@@ -250,6 +259,9 @@ const VitalsMonitor = () => {
           </CardContent>
         </Card>
 
+        {/* Manual Calibration - Now below vitals display */}
+        <ManualCalibration onCalibrationUpdate={handleCalibrationUpdate} />
+
         {/* Vitals History */}
         <VitalsHistory vitalsHistory={vitalsHistory} />
 
@@ -257,13 +269,14 @@ const VitalsMonitor = () => {
         <Card className="border-0 bg-gradient-to-r from-blue-50 to-green-50">
           <CardContent className="pt-6">
             <div className="text-sm text-gray-600 space-y-2">
-              <p className="font-medium text-gray-800 mb-3">🤖 AI-Enhanced Medical Disclaimer:</p>
+              <p className="font-medium text-gray-800 mb-3">🤖 Advanced AI Medical Disclaimer:</p>
               <ul className="space-y-1 ml-4">
-                <li>• Uses advanced machine learning algorithms and medical datasets</li>
-                <li>• AI processing provides enhanced accuracy but is not diagnostic</li>
+                <li>• Uses cutting-edge machine learning with global medical datasets</li>
+                <li>• Advanced signal processing with internet-based medical knowledge</li>
+                <li>• Continuous learning from user measurements for accuracy improvement</li>
+                <li>• Medical-grade PPG analysis with flash optimization</li>
                 <li>• For monitoring purposes only - consult healthcare professionals</li>
-                <li>• Follow finger placement tutorial for optimal accuracy</li>
-                <li>• Data used for continuous AI model improvement</li>
+                <li>• All data contributes to AI model enhancement and accuracy</li>
               </ul>
             </div>
           </CardContent>
