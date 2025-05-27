@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { processSignalWithAI } from '../utils/advancedSignalProcessor';
 import { Button } from '@/components/ui/button';
@@ -40,12 +39,15 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const processingInterval = useRef<number>();
   const recordingTimeout = useRef<number>();
   const countdownInterval = useRef<number>();
+  const currentVideoTrack = useRef<MediaStreamTrack | null>(null);
 
   const startCamera = async () => {
     try {
       setError('');
       setMeasurementComplete(false);
       setCurrentReadings(null);
+      setIsFlashOn(false);
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'environment',
@@ -62,8 +64,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         setIsActive(true);
         onProcessingChange(true);
         
+        // Store video track reference for better flash control
+        const videoTrack = mediaStream.getVideoTracks()[0];
+        currentVideoTrack.current = videoTrack;
+        
         // Turn on flash for maximum accuracy
-        await enableFlash(mediaStream);
+        await enableFlash(videoTrack);
         
         startProcessing();
         startRecordingTimer();
@@ -74,9 +80,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     }
   };
 
-  const enableFlash = async (mediaStream: MediaStream) => {
+  const enableFlash = async (videoTrack: MediaStreamTrack) => {
     try {
-      const videoTrack = mediaStream.getVideoTracks()[0];
       const capabilities = videoTrack.getCapabilities() as ExtendedMediaTrackCapabilities;
       
       if (capabilities.torch) {
@@ -95,13 +100,13 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     }
   };
 
-  const disableFlash = async (currentStream?: MediaStream) => {
-    const streamToUse = currentStream || stream;
-    if (streamToUse && isFlashOn) {
+  const disableFlash = async () => {
+    console.log('Attempting to disable flash...');
+    if (currentVideoTrack.current && isFlashOn) {
       try {
-        const videoTrack = streamToUse.getVideoTracks()[0];
-        if (videoTrack && videoTrack.readyState === 'live') {
-          await videoTrack.applyConstraints({
+        // Check if track is still live before applying constraints
+        if (currentVideoTrack.current.readyState === 'live') {
+          await currentVideoTrack.current.applyConstraints({
             advanced: [{ torch: false } as ExtendedMediaTrackConstraintSet]
           });
           console.log('Flash disabled successfully');
@@ -109,6 +114,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         setIsFlashOn(false);
       } catch (error) {
         console.error('Failed to disable flash:', error);
+        // Force disable flash state even if constraint fails
         setIsFlashOn(false);
       }
     }
@@ -117,8 +123,11 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const stopCamera = async () => {
     console.log('Stopping camera and disabling flash...');
     
-    // Disable flash first with current stream
-    await disableFlash(stream);
+    // Disable flash BEFORE stopping tracks
+    await disableFlash();
+    
+    // Wait a moment for flash to turn off
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     if (stream) {
       stream.getTracks().forEach(track => {
@@ -127,6 +136,9 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       });
       setStream(null);
     }
+    
+    // Clear references
+    currentVideoTrack.current = null;
     
     // Clear all intervals and timeouts
     if (processingInterval.current) {
@@ -147,7 +159,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     setMeasurementComplete(true);
     onProcessingChange(false);
     
-    // Store data for ML training and show final results
+    // Enhanced data processing with longer signal for better accuracy
     if (redValues.current.length > 0) {
       const finalVitals = processSignalWithAI(redValues.current, userAge, userGender);
       setCurrentReadings(finalVitals);
@@ -169,7 +181,9 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         userGender: userGender,
         signalQuality: signalQuality,
         accuracy: accuracy,
-        sessionId: crypto.randomUUID()
+        sessionId: crypto.randomUUID(),
+        flashUsed: isFlashOn,
+        dataPoints: signalData.length
       };
       
       // Store in localStorage for now (would be sent to server in production)
@@ -182,7 +196,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       }
       
       localStorage.setItem('kaggle_medical_training_data', JSON.stringify(existingData));
-      console.log('Kaggle-enhanced training data stored for ML enhancement');
+      console.log('Enhanced Kaggle training data stored for ML improvement');
     } catch (error) {
       console.error('Failed to store training data:', error);
     }
@@ -229,15 +243,19 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    // Enhanced multi-region PPG signal extraction
+    // Enhanced multi-region PPG signal extraction with improved accuracy
     const centerRegions = [
-      { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // Center region
-      { x: 0.3, y: 0.3, w: 0.4, h: 0.4 }, // Inner center
-      { x: 0.25, y: 0.25, w: 0.5, h: 0.5 } // Medium center
+      { x: 0.15, y: 0.15, w: 0.7, h: 0.7 },   // Large center region
+      { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },   // Medium center
+      { x: 0.35, y: 0.35, w: 0.3, h: 0.3 },   // Small center
+      { x: 0.2, y: 0.3, w: 0.6, h: 0.4 },     // Horizontal rectangle
+      { x: 0.3, y: 0.2, w: 0.4, h: 0.6 }      // Vertical rectangle
     ];
     
     let bestSignalQuality = 0;
     let bestPpgSignal = 0;
+    let totalSignal = 0;
+    let validRegions = 0;
     
     centerRegions.forEach(region => {
       const centerX = Math.floor(canvas.width * region.x);
@@ -264,29 +282,39 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         const avgGreen = totalGreen / validPixels;
         const avgBlue = totalBlue / validPixels;
         
-        // Advanced PPG signal with multiple wavelength analysis
+        // Enhanced PPG signal extraction with multiple wavelength analysis
         const ppgSignal = isFlashOn ? 
-          (avgRed * 1.5 - avgBlue * 0.3) / (avgGreen + 1) : // Enhanced red with blue compensation
-          (avgRed * 1.2) / (avgGreen + avgBlue + 1);
+          // Enhanced red channel extraction with flash
+          (avgRed * 2.0 - avgBlue * 0.5 - avgGreen * 0.3) / (avgGreen + avgBlue + 50) :
+          // Standard PPG without flash with improved filtering
+          (avgRed * 1.5 - avgBlue * 0.2) / (avgGreen + avgBlue + 30);
         
         const signalStrength = avgRed + avgGreen + avgBlue;
+        const signalContrast = Math.abs(avgRed - avgGreen) + Math.abs(avgRed - avgBlue);
         
-        if (signalStrength > bestSignalQuality) {
+        if (signalStrength > bestSignalQuality && signalContrast > 10) {
           bestSignalQuality = signalStrength;
           bestPpgSignal = ppgSignal;
         }
+        
+        totalSignal += ppgSignal;
+        validRegions++;
       }
     });
     
-    redValues.current.push(bestPpgSignal);
+    // Use averaged signal from multiple regions for better accuracy
+    const finalSignal = validRegions > 0 ? 
+      (bestPpgSignal * 0.7 + (totalSignal / validRegions) * 0.3) : bestPpgSignal;
+    
+    redValues.current.push(finalSignal);
     
     // Keep samples for 15 seconds at 30 FPS (450 samples)
     if (redValues.current.length > 450) {
       redValues.current.shift();
     }
 
-    // Process with enhanced accuracy when sufficient data available
-    if (redValues.current.length > 90) { // Update every 3 seconds for real-time feedback
+    // Enhanced real-time processing with better accuracy calculation
+    if (redValues.current.length > 120) { // Update every 4 seconds for better stability
       const vitals = processSignalWithAI(redValues.current, userAge, userGender);
       setSignalQuality(vitals.confidence || 0);
       setAccuracy(vitals.accuracy || 0);
@@ -296,16 +324,26 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
 
   useEffect(() => {
     return () => {
-      if (stream) {
-        disableFlash(stream).then(() => {
+      console.log('Component unmounting - cleaning up...');
+      disableFlash().then(() => {
+        if (stream) {
           stream.getTracks().forEach(track => track.stop());
-        });
-      }
+        }
+      });
       if (processingInterval.current) clearInterval(processingInterval.current);
       if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
       if (countdownInterval.current) clearInterval(countdownInterval.current);
     };
-  }, [stream]);
+  }, []);
+
+  // Additional cleanup when stream changes
+  useEffect(() => {
+    return () => {
+      if (stream && !isActive) {
+        disableFlash();
+      }
+    };
+  }, [stream, isActive]);
 
   if (showTutorial) {
     return <TutorialVideo onTutorialComplete={() => setShowTutorial(false)} />;
@@ -342,10 +380,10 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-white text-xl">✓</span>
             </div>
-            <p className="text-green-700 font-medium">Kaggle-Enhanced Analysis Complete!</p>
+            <p className="text-green-700 font-medium">Enhanced Kaggle Analysis Complete!</p>
             <div className="text-green-600 text-sm space-y-1">
               <p>Accuracy: {currentReadings.accuracy}% | Confidence: {currentReadings.confidence}%</p>
-              <p>Flash disabled, data saved for AI learning</p>
+              <p>Flash automatically disabled, enhanced data saved</p>
             </div>
           </div>
         </div>
@@ -360,7 +398,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start Kaggle AI Analysis
+            Start Enhanced AI Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
@@ -375,8 +413,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Kaggle AI Recording</span>
-              {isFlashOn && <Zap className="w-3 h-3" />}
+              <span>Enhanced AI Recording</span>
+              {isFlashOn && <Zap className="w-3 h-3 animate-pulse" />}
             </div>
           </div>
           <div className="absolute top-4 left-4">
@@ -385,13 +423,14 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             </div>
           </div>
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
-            <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded">
+            <div className="text-white text-center text-sm bg-black bg-opacity-80 px-4 py-2 rounded-lg">
               <div className="font-medium">
-                {isFlashOn ? '🔬 Kaggle AI Flash Mode' : '🔬 Enhanced Kaggle AI Mode'}
+                {isFlashOn ? '🔬 Enhanced Flash PPG Mode' : '🔬 Multi-Region PPG Analysis'}
               </div>
               {signalQuality > 0 && (
-                <div className="text-xs mt-1">
-                  Signal: {Math.round(signalQuality)}% | Kaggle AI Accuracy: {Math.round(accuracy)}%
+                <div className="text-xs mt-1 space-y-1">
+                  <div>Signal Quality: {Math.round(signalQuality)}% | Enhanced Accuracy: {Math.round(accuracy)}%</div>
+                  <div>Data Points: {redValues.current.length} | Multi-Region Analysis Active</div>
                 </div>
               )}
             </div>
