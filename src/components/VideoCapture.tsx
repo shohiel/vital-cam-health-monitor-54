@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { processSignal } from '../utils/signalProcessor';
+import { processSignalWithAI } from '../utils/advancedSignalProcessor';
 import { Button } from '@/components/ui/button';
 import { Camera, CameraOff, Zap, Info } from 'lucide-react';
 import TutorialVideo from './TutorialVideo';
@@ -225,7 +225,9 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
 
     // Process with enhanced accuracy when sufficient data available
     if (redValues.current.length > 90) { // Minimum 3 seconds for accuracy
-      const vitals = processSignal(redValues.current, userAge, userGender);
+      console.log('Processing signal with', redValues.current.length, 'samples');
+      const vitals = processSignalWithAI(redValues.current, userAge, userGender);
+      console.log('Vitals processed:', vitals);
       setSignalQuality(vitals.confidence || 0);
       setAccuracy(vitals.accuracy || 0);
       onVitalsUpdate(vitals);
