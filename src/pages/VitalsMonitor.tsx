@@ -49,7 +49,7 @@ const VitalsMonitor = () => {
     let calibratedVitals = {
       heartRate: newVitals.heartRate,
       spO2: newVitals.spO2,
-      bloodSugar: newVitals.glucose,
+      bloodSugar: newVitals.glucose, // Already in mmol/L from Kaggle processing
       bloodViscosity: newVitals.viscosity,
       bloodPressure: newVitals.systolic && newVitals.diastolic ? 
         `${newVitals.systolic}/${newVitals.diastolic}` : null
@@ -60,9 +60,12 @@ const VitalsMonitor = () => {
     setConfidence(newVitals.confidence || 0);
 
     if (calibrationData) {
-      // Apply linear calibration based on user's known values
+      // Apply linear calibration based on user's known values (mmol/L)
       if (newVitals.glucose && calibrationData.userGlucose) {
-        calibratedVitals.bloodSugar = calibrationData.userGlucose + (newVitals.glucose - calibrationData.userGlucose) * 0.8;
+        // Convert user glucose from mg/dL to mmol/L if needed
+        const userGlucoseInMmol = calibrationData.userGlucose > 20 ? 
+          calibrationData.userGlucose * 0.0555 : calibrationData.userGlucose;
+        calibratedVitals.bloodSugar = userGlucoseInMmol + (newVitals.glucose - userGlucoseInMmol) * 0.8;
       }
       if (newVitals.viscosity && calibrationData.userViscosity) {
         calibratedVitals.bloodViscosity = calibrationData.userViscosity + (newVitals.viscosity - calibrationData.userViscosity) * 0.8;
@@ -148,7 +151,7 @@ const VitalsMonitor = () => {
           <div className="flex items-center justify-center mb-4">
             <Heart className="w-8 h-8 text-red-500 mr-2 animate-pulse" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-              Kaggle-Enhanced Medical Diagnostics
+              Kaggle AI Medical Diagnostics
             </h1>
           </div>
           <p className="text-gray-600">Advanced Machine Learning with Kaggle Medical Dataset Integration</p>
@@ -273,7 +276,7 @@ const VitalsMonitor = () => {
                 <Zap className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Blood Sugar</p>
                 <p className="text-xl font-bold text-yellow-600">
-                  {vitals.bloodSugar ? `${vitals.bloodSugar.toFixed(1)} mg/dL` : '-- mg/dL'}
+                  {vitals.bloodSugar ? `${vitals.bloodSugar.toFixed(1)} mmol/L` : '-- mmol/L'}
                 </p>
                 {vitals.bloodSugar && accuracy > 0 && (
                   <p className="text-xs text-green-600 mt-1">{accuracy}% accurate</p>
@@ -284,7 +287,7 @@ const VitalsMonitor = () => {
                 <Droplets className="w-6 h-6 text-purple-500 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Blood Viscosity</p>
                 <p className="text-xl font-bold text-purple-600">
-                  {vitals.bloodViscosity ? `${vitals.bloodViscosity.toFixed(2)} Pa·s` : '-- Pa·s'}
+                  {vitals.bloodViscosity ? `${vitals.bloodViscosity.toFixed(2)} cP` : '-- cP'}
                 </p>
                 {vitals.bloodViscosity && accuracy > 0 && (
                   <p className="text-xs text-green-600 mt-1">{accuracy}% accurate</p>
@@ -294,7 +297,7 @@ const VitalsMonitor = () => {
           </CardContent>
         </Card>
 
-        {/* Manual Calibration - Now below vitals display */}
+        {/* Manual Calibration */}
         <ManualCalibration onCalibrationUpdate={handleCalibrationUpdate} />
 
         {/* Vitals History */}
@@ -304,13 +307,14 @@ const VitalsMonitor = () => {
         <Card className="border-0 bg-gradient-to-r from-blue-50 to-green-50">
           <CardContent className="pt-6">
             <div className="text-sm text-gray-600 space-y-2">
-              <p className="font-medium text-gray-800 mb-3">🤖 Kaggle-Enhanced AI Medical Disclaimer:</p>
+              <p className="font-medium text-gray-800 mb-3">🤖 Kaggle AI Medical Disclaimer:</p>
               <ul className="space-y-1 ml-4">
                 <li>• Uses cutting-edge machine learning with Kaggle medical datasets</li>
                 <li>• Advanced signal processing with verified accuracy metrics ({accuracy}%)</li>
                 <li>• Continuous learning from global medical database patterns</li>
                 <li>• Medical-grade PPG analysis with flash optimization</li>
-                <li>• Accuracy percentages based on Kaggle dataset validation</li>
+                <li>• Blood glucose measured in mmol/L (international standard)</li>
+                <li>• Flash and camera automatically disabled after analysis</li>
                 <li>• For monitoring purposes only - consult healthcare professionals</li>
                 <li>• All data contributes to Kaggle AI model enhancement</li>
               </ul>

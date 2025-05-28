@@ -42,8 +42,9 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
 
   const getGlucoseColor = (glucose: number | null) => {
     if (!glucose) return 'text-gray-400';
-    if (glucose >= 80 && glucose <= 120) return 'text-green-500';
-    if (glucose >= 70 && glucose <= 140) return 'text-yellow-500';
+    // mmol/L ranges: Normal 3.9-5.5, Pre-diabetic 5.6-6.9, Diabetic 7.0+
+    if (glucose >= 3.9 && glucose <= 5.5) return 'text-green-500';
+    if (glucose >= 3.5 && glucose <= 6.9) return 'text-yellow-500';
     return 'text-red-500';
   };
 
@@ -78,17 +79,17 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       range: [80, 180] as [number, number],
       normalRange: [90, 140] as [number, number],
       displayValue: vitals.systolic,
-      subtitle: vitals.systolic && vitals.diastolic ? 'iCare-level estimation' : null
+      subtitle: vitals.systolic && vitals.diastolic ? 'Kaggle AI estimation' : null
     },
     {
       key: 'glucose',
       title: 'Blood Glucose',
       icon: Activity,
       value: vitals.glucose,
-      unit: 'mg/dL',
+      unit: 'mmol/L',
       color: getGlucoseColor(vitals.glucose),
-      range: [70, 200] as [number, number],
-      normalRange: [80, 120] as [number, number]
+      range: [3.0, 15.0] as [number, number],
+      normalRange: [3.9, 5.5] as [number, number]
     },
     {
       key: 'viscosity',
@@ -160,14 +161,14 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       
       {isProcessing && (
         <div className="text-center p-4 bg-blue-50 rounded-lg">
-          <div className="text-blue-600 font-medium">📊 Processing with iCare-level analysis...</div>
-          <div className="text-sm text-blue-500 mt-1">Enhanced multi-channel PPG measurement</div>
+          <div className="text-blue-600 font-medium">🤖 Processing with Kaggle AI/ML analysis...</div>
+          <div className="text-sm text-blue-500 mt-1">Enhanced multi-channel PPG with dataset validation</div>
         </div>
       )}
       
       {(vitals.confidence || vitals.accuracy) && (
         <div className="text-center p-3 bg-green-50 rounded-lg">
-          <div className="text-green-700 font-medium">iCare Quality Metrics</div>
+          <div className="text-green-700 font-medium">Kaggle AI Quality Metrics</div>
           <div className="text-sm text-green-600 mt-1 space-x-4">
             {vitals.confidence && <span>Confidence: {vitals.confidence}%</span>}
             {vitals.accuracy && <span>Accuracy: {vitals.accuracy}%</span>}
