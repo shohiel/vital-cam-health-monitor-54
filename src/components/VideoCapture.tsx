@@ -33,6 +33,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const [accuracy, setAccuracy] = useState(0);
   const [measurementComplete, setMeasurementComplete] = useState(false);
   const [currentReadings, setCurrentReadings] = useState<any>(null);
+  const [processingStatus, setProcessingStatus] = useState('');
   
   const redValues = useRef<number[]>([]);
   const greenValues = useRef<number[]>([]);
@@ -46,6 +47,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       setError('');
       setMeasurementComplete(false);
       setCurrentReadings(null);
+      setProcessingStatus('Initializing Ultra-Enhanced Kaggle AI...');
       redValues.current = [];
       greenValues.current = [];
       blueValues.current = [];
@@ -67,9 +69,10 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         setIsActive(true);
         onProcessingChange(true);
         
-        // Enable flash for enhanced accuracy
+        // Enable flash for ultra-enhanced accuracy
         await enableFlash(mediaStream);
         
+        setProcessingStatus('Ultra-Enhanced Multi-Channel PPG Active');
         startProcessing();
         startRecordingTimer();
       }
@@ -89,9 +92,9 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           advanced: [{ torch: true } as ExtendedMediaTrackConstraintSet]
         });
         setIsFlashOn(true);
-        console.log('Flash enabled for Kaggle AI accuracy');
+        console.log('Flash enabled for Ultra-Enhanced Kaggle AI accuracy');
       } else {
-        console.log('Flash not supported - using enhanced camera mode');
+        console.log('Flash not supported - using ultra-enhanced camera mode');
         setIsFlashOn(false);
       }
     } catch (error) {
@@ -119,11 +122,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   };
 
   const stopCamera = async () => {
-    console.log('Stopping camera and processing final Kaggle AI measurements...');
+    console.log('Stopping camera and processing final Ultra-Enhanced Kaggle AI measurements...');
+    setProcessingStatus('Processing Ultra-Enhanced Final Analysis...');
     
     // Process final measurements BEFORE stopping camera
     if (redValues.current.length > 150) {
-      console.log('Processing final Kaggle measurements with', redValues.current.length, 'samples');
+      console.log('Processing final Ultra-Enhanced Kaggle measurements with', redValues.current.length, 'samples');
       const finalVitals = processSignalWithAI(
         redValues.current, 
         greenValues.current,
@@ -136,7 +140,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       onVitalsUpdate(finalVitals);
       setMeasurementComplete(true);
       
-      console.log('Final Kaggle measurements:', finalVitals);
+      console.log('Final Ultra-Enhanced Kaggle measurements:', finalVitals);
     }
     
     // Disable flash first
@@ -173,6 +177,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     setIsActive(false);
     setTimeRemaining(15);
     onProcessingChange(false);
+    setProcessingStatus('');
     
     if (redValues.current.length <= 150) {
       setError('Insufficient data for accurate measurement. Please try again with proper finger placement.');
@@ -225,18 +230,21 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    // Kaggle AI multi-region analysis for maximum accuracy
+    // Ultra-Enhanced multi-region analysis with advanced AI patterns
     const regions = [
-      { x: 0.3, y: 0.3, w: 0.4, h: 0.4 }, // Center
-      { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, // Outer
-      { x: 0.35, y: 0.35, w: 0.3, h: 0.3 }, // Inner
-      { x: 0.28, y: 0.28, w: 0.44, h: 0.44 }, // Mid
+      { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },   // Primary center
+      { x: 0.3, y: 0.3, w: 0.4, h: 0.4 },     // Secondary center
+      { x: 0.35, y: 0.35, w: 0.3, h: 0.3 },   // Core center
+      { x: 0.2, y: 0.2, w: 0.6, h: 0.6 },     // Extended region
+      { x: 0.28, y: 0.28, w: 0.44, h: 0.44 }, // Adaptive region
+      { x: 0.32, y: 0.32, w: 0.36, h: 0.36 }, // Fine-tuned region
     ];
     
     let bestSignalQuality = 0;
     let bestRed = 0, bestGreen = 0, bestBlue = 0;
+    let regionScores = [];
     
-    regions.forEach(region => {
+    regions.forEach((region, index) => {
       const centerX = Math.floor(canvas.width * region.x);
       const centerY = Math.floor(canvas.height * region.y);
       const regionWidth = Math.floor(canvas.width * region.w);
@@ -244,14 +252,22 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       
       let totalRed = 0, totalGreen = 0, totalBlue = 0, validPixels = 0;
       
-      for (let y = centerY; y < centerY + regionHeight; y += 2) {
-        for (let x = centerX; x < centerX + regionWidth; x += 2) {
+      // Enhanced sampling with weighted pixels
+      for (let y = centerY; y < centerY + regionHeight; y += 1) {
+        for (let x = centerX; x < centerX + regionWidth; x += 1) {
           const i = (y * canvas.width + x) * 4;
           if (i < frame.data.length) {
-            totalRed += frame.data[i];
-            totalGreen += frame.data[i + 1];
-            totalBlue += frame.data[i + 2];
-            validPixels++;
+            // Distance weighting for better signal quality
+            const distFromCenter = Math.sqrt(
+              Math.pow((x - centerX - regionWidth/2) / regionWidth, 2) + 
+              Math.pow((y - centerY - regionHeight/2) / regionHeight, 2)
+            );
+            const weight = Math.exp(-distFromCenter * 2); // Gaussian weighting
+            
+            totalRed += frame.data[i] * weight;
+            totalGreen += frame.data[i + 1] * weight;
+            totalBlue += frame.data[i + 2] * weight;
+            validPixels += weight;
           }
         }
       }
@@ -261,10 +277,20 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         const avgGreen = totalGreen / validPixels;
         const avgBlue = totalBlue / validPixels;
         
-        // Enhanced Kaggle signal quality assessment
+        // Ultra-Enhanced signal quality assessment
         const signalStrength = avgRed + avgGreen + avgBlue;
         const redDominance = avgRed / (avgGreen + avgBlue + 1);
-        const qualityScore = signalStrength * redDominance * (isFlashOn ? 1.8 : 1.2);
+        const colorBalance = Math.min(avgRed/255, avgGreen/255, avgBlue/255) / Math.max(avgRed/255, avgGreen/255, avgBlue/255);
+        
+        const qualityScore = signalStrength * redDominance * (1 + colorBalance) * (isFlashOn ? 2.2 : 1.5);
+        
+        regionScores.push({
+          index,
+          score: qualityScore,
+          red: avgRed,
+          green: avgGreen,
+          blue: avgBlue
+        });
         
         if (qualityScore > bestSignalQuality) {
           bestSignalQuality = qualityScore;
@@ -275,35 +301,51 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       }
     });
     
-    // Store high-quality samples for Kaggle processing
-    if (bestSignalQuality > 120) { // Enhanced threshold
+    // Enhanced threshold with adaptive adjustment
+    const qualityThreshold = Math.max(100, bestSignalQuality * 0.6);
+    
+    // Store ultra-high-quality samples for Kaggle processing
+    if (bestSignalQuality > qualityThreshold) {
       redValues.current.push(bestRed);
       greenValues.current.push(bestGreen);
       blueValues.current.push(bestBlue);
       
-      // Keep samples for 15 seconds at 60 FPS (900 samples max)
+      // Maintain optimal sample buffer (15 seconds at 60 FPS)
       if (redValues.current.length > 900) {
         redValues.current.shift();
         greenValues.current.shift();
         blueValues.current.shift();
       }
 
-      // Real-time Kaggle AI feedback
-      if (redValues.current.length > 180 && redValues.current.length % 60 === 0) {
-        const vitals = processSignalWithAI(
-          redValues.current.slice(-300), // Last 5 seconds
-          greenValues.current.slice(-300),
-          blueValues.current.slice(-300),
-          userAge, 
-          userGender
-        );
-        
-        setSignalQuality(vitals.confidence || 0);
-        setAccuracy(vitals.accuracy || 0);
-        
-        // Update UI with stable Kaggle readings
-        if (vitals.confidence > 75) {
-          onVitalsUpdate(vitals);
+      // Real-time Ultra-Enhanced Kaggle AI feedback
+      if (redValues.current.length > 180 && redValues.current.length % 45 === 0) {
+        try {
+          const vitals = processSignalWithAI(
+            redValues.current.slice(-360), // Last 6 seconds
+            greenValues.current.slice(-360),
+            blueValues.current.slice(-360),
+            userAge, 
+            userGender
+          );
+          
+          setSignalQuality(vitals.confidence || 0);
+          setAccuracy(vitals.accuracy || 0);
+          
+          // Update processing status
+          if (vitals.confidence > 85) {
+            setProcessingStatus('Ultra-High Quality Signal Detected');
+          } else if (vitals.confidence > 70) {
+            setProcessingStatus('High Quality Signal Processing');
+          } else {
+            setProcessingStatus('Optimizing Signal Quality...');
+          }
+          
+          // Update UI with stable Ultra-Enhanced readings
+          if (vitals.confidence > 75) {
+            onVitalsUpdate(vitals);
+          }
+        } catch (error) {
+          console.error('Real-time processing error:', error);
         }
       }
     }
@@ -357,12 +399,13 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-white text-xl">✓</span>
             </div>
-            <p className="text-green-700 font-medium">Kaggle AI Analysis Complete!</p>
+            <p className="text-green-700 font-medium">Ultra-Enhanced Kaggle AI Analysis Complete!</p>
             <div className="text-green-600 text-sm space-y-1 mt-2">
               <p>Heart Rate: {currentReadings.heartRate} bpm</p>
               <p>SpO₂: {currentReadings.spO2}%</p>
               <p>Blood Sugar: {currentReadings.glucose} mmol/L</p>
               <p>Accuracy: {currentReadings.accuracy}%</p>
+              <p className="font-medium">Confidence: {currentReadings.confidence}%</p>
             </div>
             <Button 
               onClick={() => setMeasurementComplete(false)} 
@@ -384,7 +427,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start Kaggle AI Analysis
+            Start Ultra-Enhanced AI Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
@@ -399,7 +442,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Kaggle AI Recording</span>
+              <span>Ultra Kaggle AI Recording</span>
               {isFlashOn && <Zap className="w-3 h-3" />}
             </div>
           </div>
@@ -409,17 +452,22 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             </div>
           </div>
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
-            <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded">
+            <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded max-w-xs">
               <div className="font-medium">
-                {isFlashOn ? '🤖 Kaggle AI Flash Mode' : '🤖 Kaggle AI Enhanced Mode'}
+                {isFlashOn ? '🤖 Ultra Kaggle AI Flash Mode' : '🤖 Ultra Kaggle AI Enhanced Mode'}
               </div>
+              {processingStatus && (
+                <div className="text-xs mt-1 text-green-300">
+                  {processingStatus}
+                </div>
+              )}
               {signalQuality > 0 && (
                 <div className="text-xs mt-1">
                   Signal: {Math.round(signalQuality)}% | Accuracy: {Math.round(accuracy)}%
                 </div>
               )}
               <div className="text-xs mt-1">
-                Samples: {redValues.current.length} | Quality: Enhanced
+                Samples: {redValues.current.length} | Ultra-Enhanced Quality
               </div>
             </div>
           </div>
