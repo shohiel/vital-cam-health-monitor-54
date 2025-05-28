@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { processSignalWithAI } from '../utils/advancedSignalProcessor';
 import { Button } from '@/components/ui/button';
@@ -37,6 +36,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
   const [currentReadings, setCurrentReadings] = useState<any>(null);
   
   const redValues = useRef<number[]>([]);
+  const greenValues = useRef<number[]>([]);
+  const blueValues = useRef<number[]>([]);
   const processingInterval = useRef<number>();
   const recordingTimeout = useRef<number>();
   const countdownInterval = useRef<number>();
@@ -46,11 +47,16 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       setError('');
       setMeasurementComplete(false);
       setCurrentReadings(null);
+      redValues.current = [];
+      greenValues.current = [];
+      blueValues.current = [];
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 60, min: 30 }
         },
         audio: false
       });
@@ -62,14 +68,14 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         setIsActive(true);
         onProcessingChange(true);
         
-        // Turn on flash for maximum accuracy
+        // Turn on flash for maximum accuracy like iCare
         await enableFlash(mediaStream);
         
         startProcessing();
         startRecordingTimer();
       }
     } catch (err) {
-      setError('Camera access denied. Please allow camera permission and follow the tutorial for accurate measurements.');
+      setError('Camera access denied. Please allow camera permission and ensure proper finger placement over the camera.');
       console.error('Camera error:', err);
     }
   };
@@ -84,7 +90,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           advanced: [{ torch: true } as ExtendedMediaTrackConstraintSet]
         });
         setIsFlashOn(true);
-        console.log('Flash enabled for maximum PPG signal accuracy');
+        console.log('Flash enabled for iCare-level accuracy');
       } else {
         console.log('Flash not supported - using enhanced camera mode');
         setIsFlashOn(false);
@@ -106,18 +112,17 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           });
           console.log('Flash disabled successfully');
         }
-        setIsFlashOn(false);
       } catch (error) {
         console.error('Failed to disable flash:', error);
-        setIsFlashOn(false);
       }
     }
+    setIsFlashOn(false);
   };
 
   const stopCamera = async () => {
-    console.log('Stopping camera and disabling flash...');
+    console.log('Stopping camera and processing final measurements...');
     
-    // Disable flash first with current stream
+    // Disable flash first
     await disableFlash(stream);
     
     if (stream) {
@@ -144,48 +149,31 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     
     setIsActive(false);
     setTimeRemaining(15);
-    setMeasurementComplete(true);
     onProcessingChange(false);
     
-    // Store data for ML training and show final results
-    if (redValues.current.length > 0) {
-      const finalVitals = processSignalWithAI(redValues.current, userAge, userGender);
+    // Process final measurements with enhanced accuracy
+    if (redValues.current.length > 150) { // Ensure sufficient data
+      console.log('Processing final measurements with', redValues.current.length, 'samples');
+      const finalVitals = processSignalWithAI(
+        redValues.current, 
+        greenValues.current,
+        blueValues.current,
+        userAge, 
+        userGender
+      );
+      
       setCurrentReadings(finalVitals);
       onVitalsUpdate(finalVitals);
-      await storeDataForLearning(redValues.current, finalVitals);
+      setMeasurementComplete(true);
+      
+      console.log('Final measurements:', finalVitals);
+    } else {
+      setError('Insufficient data for accurate measurement. Please try again with proper finger placement.');
     }
     
     redValues.current = [];
-    console.log('Measurement completed - flash and camera turned off');
-  };
-
-  const storeDataForLearning = async (signalData: number[], vitalsData: any) => {
-    try {
-      const trainingData = {
-        timestamp: new Date().toISOString(),
-        signalData: signalData,
-        vitalsData: vitalsData,
-        userAge: userAge,
-        userGender: userGender,
-        signalQuality: signalQuality,
-        accuracy: accuracy,
-        sessionId: crypto.randomUUID()
-      };
-      
-      // Store in localStorage for now (would be sent to server in production)
-      const existingData = JSON.parse(localStorage.getItem('kaggle_medical_training_data') || '[]');
-      existingData.push(trainingData);
-      
-      // Keep only last 100 sessions to manage storage
-      if (existingData.length > 100) {
-        existingData.splice(0, existingData.length - 100);
-      }
-      
-      localStorage.setItem('kaggle_medical_training_data', JSON.stringify(existingData));
-      console.log('Kaggle-enhanced training data stored for ML enhancement');
-    } catch (error) {
-      console.error('Failed to store training data:', error);
-    }
+    greenValues.current = [];
+    blueValues.current = [];
   };
 
   const startRecordingTimer = () => {
@@ -208,7 +196,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
 
   const startProcessing = () => {
     if (!processingInterval.current) {
-      processingInterval.current = window.setInterval(processFrame, 33); // 30 FPS
+      processingInterval.current = window.setInterval(processFrame, 16); // 60 FPS for better accuracy
     }
   };
 
@@ -229,17 +217,17 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    // Enhanced multi-region PPG signal extraction
-    const centerRegions = [
-      { x: 0.2, y: 0.2, w: 0.6, h: 0.6 }, // Center region
-      { x: 0.3, y: 0.3, w: 0.4, h: 0.4 }, // Inner center
-      { x: 0.25, y: 0.25, w: 0.5, h: 0.5 } // Medium center
+    // iCare-style multi-region analysis for enhanced accuracy
+    const regions = [
+      { x: 0.3, y: 0.3, w: 0.4, h: 0.4 }, // Center region
+      { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, // Outer region
+      { x: 0.35, y: 0.35, w: 0.3, h: 0.3 }, // Inner region
     ];
     
     let bestSignalQuality = 0;
-    let bestPpgSignal = 0;
+    let bestRed = 0, bestGreen = 0, bestBlue = 0;
     
-    centerRegions.forEach(region => {
+    regions.forEach(region => {
       const centerX = Math.floor(canvas.width * region.x);
       const centerY = Math.floor(canvas.height * region.y);
       const regionWidth = Math.floor(canvas.width * region.w);
@@ -247,8 +235,8 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
       
       let totalRed = 0, totalGreen = 0, totalBlue = 0, validPixels = 0;
       
-      for (let y = centerY; y < centerY + regionHeight; y++) {
-        for (let x = centerX; x < centerX + regionWidth; x++) {
+      for (let y = centerY; y < centerY + regionHeight; y += 2) { // Skip pixels for performance
+        for (let x = centerX; x < centerX + regionWidth; x += 2) {
           const i = (y * canvas.width + x) * 4;
           if (i < frame.data.length) {
             totalRed += frame.data[i];
@@ -264,33 +252,53 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         const avgGreen = totalGreen / validPixels;
         const avgBlue = totalBlue / validPixels;
         
-        // Advanced PPG signal with multiple wavelength analysis
-        const ppgSignal = isFlashOn ? 
-          (avgRed * 1.5 - avgBlue * 0.3) / (avgGreen + 1) : // Enhanced red with blue compensation
-          (avgRed * 1.2) / (avgGreen + avgBlue + 1);
-        
+        // Signal quality assessment like iCare
         const signalStrength = avgRed + avgGreen + avgBlue;
+        const redDominance = avgRed / (avgGreen + avgBlue + 1);
         
-        if (signalStrength > bestSignalQuality) {
-          bestSignalQuality = signalStrength;
-          bestPpgSignal = ppgSignal;
+        // Prefer regions with good red signal and flash enhancement
+        const qualityScore = signalStrength * redDominance * (isFlashOn ? 1.5 : 1.0);
+        
+        if (qualityScore > bestSignalQuality) {
+          bestSignalQuality = qualityScore;
+          bestRed = avgRed;
+          bestGreen = avgGreen;
+          bestBlue = avgBlue;
         }
       }
     });
     
-    redValues.current.push(bestPpgSignal);
-    
-    // Keep samples for 15 seconds at 30 FPS (450 samples)
-    if (redValues.current.length > 450) {
-      redValues.current.shift();
-    }
+    // Store high-quality samples
+    if (bestSignalQuality > 100) { // Quality threshold
+      redValues.current.push(bestRed);
+      greenValues.current.push(bestGreen);
+      blueValues.current.push(bestBlue);
+      
+      // Keep samples for 15 seconds at 60 FPS (900 samples max)
+      if (redValues.current.length > 900) {
+        redValues.current.shift();
+        greenValues.current.shift();
+        blueValues.current.shift();
+      }
 
-    // Process with enhanced accuracy when sufficient data available
-    if (redValues.current.length > 90) { // Update every 3 seconds for real-time feedback
-      const vitals = processSignalWithAI(redValues.current, userAge, userGender);
-      setSignalQuality(vitals.confidence || 0);
-      setAccuracy(vitals.accuracy || 0);
-      onVitalsUpdate(vitals);
+      // Real-time feedback with iCare-level processing
+      if (redValues.current.length > 180 && redValues.current.length % 60 === 0) { // Update every second
+        const vitals = processSignalWithAI(
+          redValues.current.slice(-300), // Use last 5 seconds for real-time
+          greenValues.current.slice(-300),
+          blueValues.current.slice(-300),
+          userAge, 
+          userGender
+        );
+        
+        setSignalQuality(vitals.confidence || 0);
+        setAccuracy(vitals.accuracy || 0);
+        
+        // Only update UI with stable readings
+        if (vitals.confidence > 70) {
+          onVitalsUpdate(vitals);
+        }
+      }
     }
   };
 
@@ -342,10 +350,11 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-white text-xl">✓</span>
             </div>
-            <p className="text-green-700 font-medium">Kaggle-Enhanced Analysis Complete!</p>
+            <p className="text-green-700 font-medium">iCare-Level Analysis Complete!</p>
             <div className="text-green-600 text-sm space-y-1">
-              <p>Accuracy: {currentReadings.accuracy}% | Confidence: {currentReadings.confidence}%</p>
-              <p>Flash disabled, data saved for AI learning</p>
+              <p>Heart Rate: {currentReadings.heartRate} bpm</p>
+              <p>SpO₂: {currentReadings.spO2}%</p>
+              <p>Accuracy: {currentReadings.accuracy}%</p>
             </div>
           </div>
         </div>
@@ -360,12 +369,12 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
         {!isActive ? (
           <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
             <Camera className="w-4 h-4 mr-2" />
-            Start Kaggle AI Analysis
+            Start iCare Analysis
           </Button>
         ) : (
           <Button onClick={stopCamera} variant="destructive">
             <CameraOff className="w-4 h-4 mr-2" />
-            Stop & Save
+            Stop & Analyze
           </Button>
         )}
       </div>
@@ -375,7 +384,7 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute top-4 right-4">
             <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Kaggle AI Recording</span>
+              <span>iCare Recording</span>
               {isFlashOn && <Zap className="w-3 h-3" />}
             </div>
           </div>
@@ -387,13 +396,16 @@ const VideoCapture = ({ onVitalsUpdate, onProcessingChange, userAge, userGender 
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
             <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded">
               <div className="font-medium">
-                {isFlashOn ? '🔬 Kaggle AI Flash Mode' : '🔬 Enhanced Kaggle AI Mode'}
+                {isFlashOn ? '🔬 iCare Flash Mode' : '🔬 Enhanced iCare Mode'}
               </div>
               {signalQuality > 0 && (
                 <div className="text-xs mt-1">
-                  Signal: {Math.round(signalQuality)}% | Kaggle AI Accuracy: {Math.round(accuracy)}%
+                  Signal: {Math.round(signalQuality)}% | Accuracy: {Math.round(accuracy)}%
                 </div>
               )}
+              <div className="text-xs mt-1">
+                Samples: {redValues.current.length}
+              </div>
             </div>
           </div>
         </>

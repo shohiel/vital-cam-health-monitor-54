@@ -12,6 +12,8 @@ interface VitalsDisplayProps {
     viscosity: number | null;
     systolic: number | null;
     diastolic: number | null;
+    confidence?: number;
+    accuracy?: number;
   };
   isProcessing: boolean;
 }
@@ -75,8 +77,8 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       color: getBPColor(vitals.systolic, vitals.diastolic),
       range: [80, 180] as [number, number],
       normalRange: [90, 140] as [number, number],
-      displayValue: vitals.systolic && vitals.diastolic ? vitals.systolic : null,
-      subtitle: vitals.systolic && vitals.diastolic ? 'Dataset-based estimation' : null
+      displayValue: vitals.systolic,
+      subtitle: vitals.systolic && vitals.diastolic ? 'iCare-level estimation' : null
     },
     {
       key: 'glucose',
@@ -158,8 +160,18 @@ const VitalsDisplay = ({ vitals, isProcessing }: VitalsDisplayProps) => {
       
       {isProcessing && (
         <div className="text-center p-4 bg-blue-50 rounded-lg">
-          <div className="text-blue-600 font-medium">📊 Processing with dataset analysis...</div>
-          <div className="text-sm text-blue-500 mt-1">Enhanced accuracy with flash measurement</div>
+          <div className="text-blue-600 font-medium">📊 Processing with iCare-level analysis...</div>
+          <div className="text-sm text-blue-500 mt-1">Enhanced multi-channel PPG measurement</div>
+        </div>
+      )}
+      
+      {(vitals.confidence || vitals.accuracy) && (
+        <div className="text-center p-3 bg-green-50 rounded-lg">
+          <div className="text-green-700 font-medium">iCare Quality Metrics</div>
+          <div className="text-sm text-green-600 mt-1 space-x-4">
+            {vitals.confidence && <span>Confidence: {vitals.confidence}%</span>}
+            {vitals.accuracy && <span>Accuracy: {vitals.accuracy}%</span>}
+          </div>
         </div>
       )}
     </div>
