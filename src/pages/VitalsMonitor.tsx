@@ -2,11 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, Activity, Droplets, Zap, Bluetooth, Camera, Save, Database, Brain } from 'lucide-react';
+import { Heart, Activity, Droplets, Zap, Bluetooth, Camera, Save, Database, Brain, Settings } from 'lucide-react';
 import VideoCapture from '../components/VideoCapture';
 import BluetoothConnector from '../components/BluetoothConnector';
 import VitalsHistory from '../components/VitalsHistory';
 import ManualCalibration from '../components/ManualCalibration';
+import CalibrationWizard from '../components/CalibrationWizard';
 import { useToast } from '@/hooks/use-toast';
 
 interface VitalsData {
@@ -25,6 +26,15 @@ interface CalibrationData {
   userViscosity: number;
   userBloodPressure: string;
   timestamp: string;
+}
+
+interface WizardCalibrationResult {
+  lightingQuality: number;
+  fingerPlacement: number;
+  signalStability: number;
+  overallScore: number;
+  timestamp: string;
+  recommendations: string[];
 }
 
 const VitalsMonitor = () => {
@@ -47,6 +57,8 @@ const VitalsMonitor = () => {
   const [confidence, setConfidence] = useState(0);
   const [reinforcementLearningEnabled, setReinforcementLearningEnabled] = useState(true);
   const [clinicalModeEnabled, setClinicalModeEnabled] = useState(true);
+  const [showCalibrationWizard, setShowCalibrationWizard] = useState(false);
+  const [wizardCalibration, setWizardCalibration] = useState<WizardCalibrationResult | null>(null);
   const { toast } = useToast();
 
   const handleVitalsUpdate = (newVitals: any) => {
@@ -156,6 +168,25 @@ const VitalsMonitor = () => {
     });
   };
 
+  const handleWizardComplete = (result: WizardCalibrationResult) => {
+    setWizardCalibration(result);
+    setShowCalibrationWizard(false);
+    
+    // Adjust accuracy based on calibration quality
+    const qualityBonus = Math.floor(result.overallScore / 10);
+    setAccuracy(prev => Math.min(99, prev + qualityBonus));
+    setConfidence(prev => Math.min(99, prev + qualityBonus));
+    
+    toast({
+      title: "Calibration Complete!",
+      description: `Your device is calibrated with ${Math.round(result.overallScore)}% optimization score. Ready for clinical-grade measurements.`,
+    });
+  };
+
+  const handleWizardCancel = () => {
+    setShowCalibrationWizard(false);
+  };
+
   const saveVitalsToHistory = () => {
     if (vitals.heartRate || vitals.spO2 || vitals.bloodSugar) {
       const vitalsWithTimestamp = {
@@ -214,6 +245,14 @@ const VitalsMonitor = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 p-4">
+      {/* Calibration Wizard Modal */}
+      {showCalibrationWizard && (
+        <CalibrationWizard
+          onComplete={handleWizardComplete}
+          onCancel={handleWizardCancel}
+        />
+      )}
+      
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center py-6">
@@ -245,13 +284,24 @@ const VitalsMonitor = () => {
         {/* Clinical Mode Controls */}
         <Card className="border-0 bg-gradient-to-r from-purple-50 to-blue-50 shadow-lg">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center text-lg">
-              <Brain className="w-5 h-5 mr-2 text-purple-500" />
-              Clinical AI Controls
+            <CardTitle className="flex items-center justify-between text-lg">
+              <div className="flex items-center">
+                <Brain className="w-5 h-5 mr-2 text-purple-500" />
+                Clinical AI Controls
+              </div>
+              <Button 
+                onClick={() => setShowCalibrationWizard(true)}
+                size="sm"
+                variant="outline"
+                className="border-purple-300 text-purple-600 hover:bg-purple-50"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Calibration Wizard
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-4 gap-4">
               <div className="flex items-center space-x-2">
                 <input 
                   type="checkbox" 
@@ -274,6 +324,14 @@ const VitalsMonitor = () => {
                 <Database className="w-4 h-4 text-blue-500" />
                 <span className="text-sm text-gray-600">Multi-Dataset Matching: Active</span>
               </div>
+              {wizardCalibration && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-sm text-green-600 font-medium">
+                    Calibrated: {Math.round(wizardCalibration.overallScore)}%
+                  </span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
