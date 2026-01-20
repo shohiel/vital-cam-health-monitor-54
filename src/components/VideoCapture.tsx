@@ -2,8 +2,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { processSignalWithAI } from '../utils/advancedSignalProcessor';
 import { Button } from '@/components/ui/button';
-import { Camera, CameraOff, Zap, Info } from 'lucide-react';
+import { Camera, CameraOff, Zap, Info, BarChart3 } from 'lucide-react';
 import TutorialVideo from './TutorialVideo';
+import WaveformVisualization from './WaveformVisualization';
 
 interface VideoCaptureProps {
   onVitalsUpdate: (vitals: any) => void;
@@ -44,6 +45,10 @@ const VideoCapture = ({
   const [currentReadings, setCurrentReadings] = useState<any>(null);
   const [processingStatus, setProcessingStatus] = useState('');
   const [sampleCount, setSampleCount] = useState(0);
+  const [showWaveform, setShowWaveform] = useState(true);
+  const [displayRedValues, setDisplayRedValues] = useState<number[]>([]);
+  const [displayGreenValues, setDisplayGreenValues] = useState<number[]>([]);
+  const [displayBlueValues, setDisplayBlueValues] = useState<number[]>([]);
   
   const redValues = useRef<number[]>([]);
   const greenValues = useRef<number[]>([]);
@@ -343,7 +348,12 @@ const VideoCapture = ({
       blueValues.current.push(bestBlue);
       setSampleCount(redValues.current.length);
       
-      console.log(`Sample ${redValues.current.length}: R=${bestRed.toFixed(1)}, G=${bestGreen.toFixed(1)}, B=${bestBlue.toFixed(1)}`);
+      // Update display values for waveform visualization every 2 samples for performance
+      if (redValues.current.length % 2 === 0) {
+        setDisplayRedValues([...redValues.current]);
+        setDisplayGreenValues([...greenValues.current]);
+        setDisplayBlueValues([...blueValues.current]);
+      }
       
       // Maintain optimal clinical sample buffer (12 seconds at 60 FPS = 720 samples)
       if (redValues.current.length > 720) {
@@ -425,105 +435,128 @@ const VideoCapture = ({
   }
 
   return (
-    <div className="relative">
-      <video
-        ref={videoRef}
-        className="w-full rounded-lg bg-gray-900"
-        autoPlay
-        playsInline
-        muted
-        style={{ maxHeight: '400px' }}
-      />
-      <canvas ref={canvasRef} className="hidden" />
-      
-      {error && (
-        <div className="absolute inset-0 bg-red-50 border-2 border-red-200 rounded-lg flex items-center justify-center p-4">
-          <div className="text-center">
-            <CameraOff className="w-8 h-8 text-red-500 mx-auto mb-2" />
-            <p className="text-red-700 text-sm mb-3">{error}</p>
-            <Button onClick={() => setShowTutorial(true)} size="sm" className="bg-blue-500 hover:bg-blue-600">
-              <Info className="w-4 h-4 mr-2" />
-              Clinical Instructions
-            </Button>
-          </div>
-        </div>
-      )}
-      
-      {measurementComplete && currentReadings && (
-        <div className="absolute inset-0 bg-green-50 border-2 border-green-200 rounded-lg flex items-center justify-center p-4">
-          <div className="text-center">
-            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-white text-xl">✓</span>
+    <div className="space-y-4">
+      <div className="relative">
+        <video
+          ref={videoRef}
+          className="w-full rounded-lg bg-gray-900"
+          autoPlay
+          playsInline
+          muted
+          style={{ maxHeight: '300px' }}
+        />
+        <canvas ref={canvasRef} className="hidden" />
+        
+        {error && (
+          <div className="absolute inset-0 bg-red-50 border-2 border-red-200 rounded-lg flex items-center justify-center p-4">
+            <div className="text-center">
+              <CameraOff className="w-8 h-8 text-red-500 mx-auto mb-2" />
+              <p className="text-red-700 text-sm mb-3">{error}</p>
+              <Button onClick={() => setShowTutorial(true)} size="sm" className="bg-blue-500 hover:bg-blue-600">
+                <Info className="w-4 h-4 mr-2" />
+                Clinical Instructions
+              </Button>
             </div>
-            <p className="text-green-700 font-medium">Clinical Analysis Complete!</p>
-            <div className="text-green-600 text-sm space-y-1 mt-2">
-              <p>Heart Rate: {currentReadings.heartRate} bpm</p>
-              <p>SpO₂: {currentReadings.spO2}%</p>
-              <p>Blood Glucose: {currentReadings.glucose} mmol/L</p>
-              <p>Clinical Accuracy: {currentReadings.accuracy}%</p>
-              <p className="font-medium">AI Confidence: {currentReadings.confidence}%</p>
-              <p className="text-xs text-blue-600 mt-2">Camera automatically stopped</p>
-            </div>
-            <Button 
-              onClick={() => setMeasurementComplete(false)} 
-              size="sm" 
-              className="mt-3 bg-green-600 hover:bg-green-700"
-            >
-              Continue
-            </Button>
           </div>
+        )}
+        
+        {measurementComplete && currentReadings && (
+          <div className="absolute inset-0 bg-green-50 border-2 border-green-200 rounded-lg flex items-center justify-center p-4">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-white text-xl">✓</span>
+              </div>
+              <p className="text-green-700 font-medium">Clinical Analysis Complete!</p>
+              <div className="text-green-600 text-sm space-y-1 mt-2">
+                <p>Heart Rate: {currentReadings.heartRate} bpm</p>
+                <p>SpO₂: {currentReadings.spO2}%</p>
+                <p>Blood Glucose: {currentReadings.glucose} mmol/L</p>
+                <p>Clinical Accuracy: {currentReadings.accuracy}%</p>
+                <p className="font-medium">AI Confidence: {currentReadings.confidence}%</p>
+                <p className="text-xs text-blue-600 mt-2">Camera automatically stopped</p>
+              </div>
+              <Button 
+                onClick={() => setMeasurementComplete(false)} 
+                size="sm" 
+                className="mt-3 bg-green-600 hover:bg-green-700"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+          <Button onClick={() => setShowTutorial(true)} size="sm" variant="outline" className="bg-blue-50 hover:bg-blue-100">
+            <Info className="w-4 h-4 mr-2" />
+            Clinical Guide
+          </Button>
+          
+          {isActive && (
+            <>
+              <Button 
+                onClick={() => setShowWaveform(!showWaveform)} 
+                size="sm" 
+                variant="outline" 
+                className="bg-gray-800 hover:bg-gray-700 text-white border-gray-600"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                {showWaveform ? 'Hide' : 'Show'} Waveform
+              </Button>
+              <Button onClick={stopCamera} variant="destructive">
+                <CameraOff className="w-4 h-4 mr-2" />
+                Stop & Analyze
+              </Button>
+            </>
+          )}
         </div>
-      )}
-      
-      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-        <Button onClick={() => setShowTutorial(true)} size="sm" variant="outline" className="bg-blue-50 hover:bg-blue-100">
-          <Info className="w-4 h-4 mr-2" />
-          Clinical Guide
-        </Button>
         
         {isActive && (
-          <Button onClick={stopCamera} variant="destructive">
-            <CameraOff className="w-4 h-4 mr-2" />
-            Stop & Analyze
-          </Button>
+          <>
+            <div className="absolute top-4 right-4">
+              <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <span>Clinical Recording</span>
+                {isFlashOn && <Zap className="w-3 h-3" />}
+              </div>
+            </div>
+            <div className="absolute top-4 left-4">
+              <div className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                {timeRemaining}s
+              </div>
+            </div>
+            <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
+              <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded max-w-xs">
+                <div className="font-medium">
+                  {isFlashOn ? '🏥 Clinical Flash Mode' : '🏥 Clinical Enhanced Mode'}
+                </div>
+                {processingStatus && (
+                  <div className="text-xs mt-1 text-green-300">
+                    {processingStatus}
+                  </div>
+                )}
+                {signalQuality > 0 && (
+                  <div className="text-xs mt-1">
+                    Signal: {Math.round(signalQuality)}% | Accuracy: {Math.round(accuracy)}%
+                  </div>
+                )}
+                <div className="text-xs mt-1 font-bold text-yellow-300">
+                  Samples: {sampleCount}/150 {sampleCount >= 150 ? '✓ Ready' : ''}
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
-      
-      {isActive && (
-        <>
-          <div className="absolute top-4 right-4">
-            <div className="flex items-center space-x-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm">
-              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>Clinical Recording</span>
-              {isFlashOn && <Zap className="w-3 h-3" />}
-            </div>
-          </div>
-          <div className="absolute top-4 left-4">
-            <div className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-              {timeRemaining}s
-            </div>
-          </div>
-          <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2">
-            <div className="text-white text-center text-sm bg-black bg-opacity-70 px-3 py-2 rounded max-w-xs">
-              <div className="font-medium">
-                {isFlashOn ? '🏥 Clinical Flash Mode' : '🏥 Clinical Enhanced Mode'}
-              </div>
-              {processingStatus && (
-                <div className="text-xs mt-1 text-green-300">
-                  {processingStatus}
-                </div>
-              )}
-              {signalQuality > 0 && (
-                <div className="text-xs mt-1">
-                  Signal: {Math.round(signalQuality)}% | Accuracy: {Math.round(accuracy)}%
-                </div>
-              )}
-              <div className="text-xs mt-1 font-bold text-yellow-300">
-                Samples: {sampleCount}/150 {sampleCount >= 150 ? '✓ Ready' : ''}
-              </div>
-            </div>
-          </div>
-        </>
+
+      {/* Real-time Waveform Visualization */}
+      {isActive && showWaveform && (
+        <WaveformVisualization
+          redValues={displayRedValues}
+          greenValues={displayGreenValues}
+          blueValues={displayBlueValues}
+          sampleRate={60}
+        />
       )}
     </div>
   );
