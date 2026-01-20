@@ -361,8 +361,25 @@ const VideoCapture = ({
     }
   };
 
+  // Auto-start camera when component mounts
   useEffect(() => {
+    let mounted = true;
+    
+    const initCamera = async () => {
+      if (mounted) {
+        try {
+          await startCamera();
+        } catch (err) {
+          console.error('Failed to auto-start camera:', err);
+          setError('Failed to start camera. Please try again.');
+        }
+      }
+    };
+    
+    initCamera();
+    
     return () => {
+      mounted = false;
       if (stream) {
         disableFlash(stream).then(() => {
           stream.getTracks().forEach(track => track.stop());
@@ -372,7 +389,7 @@ const VideoCapture = ({
       if (recordingTimeout.current) clearTimeout(recordingTimeout.current);
       if (countdownInterval.current) clearInterval(countdownInterval.current);
     };
-  }, [stream]);
+  }, []);
 
   if (showTutorial) {
     return <TutorialVideo onTutorialComplete={() => setShowTutorial(false)} />;
@@ -435,12 +452,7 @@ const VideoCapture = ({
           Clinical Guide
         </Button>
         
-        {!isActive ? (
-          <Button onClick={startCamera} className="bg-green-500 hover:bg-green-600">
-            <Camera className="w-4 h-4 mr-2" />
-            Start Clinical Analysis
-          </Button>
-        ) : (
+        {isActive && (
           <Button onClick={stopCamera} variant="destructive">
             <CameraOff className="w-4 h-4 mr-2" />
             Stop & Analyze
